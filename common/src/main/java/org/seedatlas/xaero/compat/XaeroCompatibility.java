@@ -16,6 +16,7 @@ import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.FieldNode;
@@ -37,6 +38,13 @@ public final class XaeroCompatibility {
     public static final String PROPERTY = "seedatlas_xaero.xaeroCompatibility";
     private static final String OWN = "org/seedatlas/xaero/";
     private static final String XAERO = "xaero/";
+    /** Our mixin classes, whose injection annotations must resolve against the installed Xaero. */
+    private static final List<String> MIXINS = List.of(
+        "org/seedatlas/xaero/mixin/GuiMapMixin",
+        "org/seedatlas/xaero/mixin/BranchTextureRendererMixin",
+        "org/seedatlas/xaero/mixin/BranchRegionTextureMixin",
+        "org/seedatlas/xaero/mixin/BranchLeveledRegionMixin",
+        "org/seedatlas/xaero/mixin/WorldMapClientOnlyMixin");
     /** Everything that touches Xaero is reachable from these classes. */
     static final List<String> ROOTS = List.of(
         "org/seedatlas/xaero/SeedAtlasXaero",
@@ -128,8 +136,82 @@ public final class XaeroCompatibility {
     public static Report check(ClassSource source) {
         XaeroCompatibility check = new XaeroCompatibility(source);
         check.mixinTargets();
+        check.injectionTargets();
         check.linkage();
         return new Report(List.copyOf(check.problems), List.copyOf(check.warnings), Set.copyOf(check.checked));
+    }
+
+    /**
+     * Every {@code @At(target = "...")} in our mixins is a literal string, so unlike a normal call it
+     * is invisible to {@link #linkage()}: a target that names the wrong descriptor simply matches
+     * nothing and Mixin fails the injection at class-transform time, crashing the game rather than
+     * disabling the mod. Each target is therefore resolved here against the real Xaero class, which
+     * also proves the member exists in this namespace. This is the check that would have caught the
+     * {@code getRenderer} target still naming its pre-1.21.11 single-argument form.
+     */
+    private void injectionTargets() {
+        for (String mixin : MIXINS) {
+            ClassNode node = node(mixin);
+            if (node == null) continue;
+            for (MethodNode method : node.methods) {
+                if (method.visibleAnnotations == null) continue;
+                for (AnnotationNode annotation : method.visibleAnnotations) {
+                    for (String reference : annotationTargets(annotation)) {
+                        require(resolves(reference),
+                            simple(mixin) + "." + method.name + " targets a member that does not exist: " + reference);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Every {@code target} string reachable from one annotation, including the ones nested inside
+     * parameters such as {@code @At}: the annotation tree is made of {@link AnnotationNode}s, so a
+     * {@code target} is a value of the inner node rather than of the injection annotation itself.
+     */
+    private static String[] annotationTargets(AnnotationNode annotation) {
+        List<String> found = new ArrayList<>();
+        collectTargets(annotation, found);
+        return found.toArray(String[]::new);
+    }
+
+    private static void collectTargets(AnnotationNode annotation, List<String> found) {
+        if (annotation.values == null) return;
+        for (int i = 0; i + 1 < annotation.values.size(); i += 2) {
+            Object value = annotation.values.get(i + 1);
+            if (String.valueOf(annotation.values.get(i)).equals("target") && value instanceof String single
+                && single.startsWith("L") && single.contains(";") && single.contains("(")) {
+                found.add(single);
+            }
+            collectNested(value, found);
+        }
+    }
+
+    /** Walks nested annotations and annotation lists, which is how {@code at = @At(...)} appears. */
+    private static void collectNested(Object value, List<String> found) {
+        if (value instanceof AnnotationNode nested) {
+            collectTargets(nested, found);
+        } else if (value instanceof List<?> list) {
+            for (Object element : list) collectNested(element, found);
+        }
+    }
+
+    /** True when an {@code owner;name(desc)ret} reference exists in the classes under inspection. */
+    private boolean resolves(String reference) {
+        int semicolon = reference.indexOf(';');
+        int paren = reference.indexOf('(');
+        if (semicolon < 0 || paren < semicolon) return false;
+        String owner = reference.substring(1, semicolon);
+        String rest = reference.substring(semicolon + 1);
+        int open = rest.indexOf('(');
+        if (open < 0) return false;
+        String name = rest.substring(0, open);
+        String descriptor = rest.substring(open);
+        ClassNode target = node(owner);
+        if (target == null) return false;
+        return target.methods.stream().anyMatch(m -> m.name.equals(name) && m.desc.equals(descriptor))
+            || target.fields.stream().anyMatch(f -> f.name.equals(name));
     }
 
     /** Records the plugin's verdict for this game session. */

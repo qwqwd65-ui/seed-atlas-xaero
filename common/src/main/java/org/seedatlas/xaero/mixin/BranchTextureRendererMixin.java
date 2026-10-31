@@ -21,7 +21,7 @@ abstract class BranchTextureRendererMixin {
 
     @ModifyArg(method = "render", at = @At(
         value = "INVOKE",
-        target = "Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider;getRenderer(Lnet/minecraft/client/renderer/rendertype/RenderType;)Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRenderer;"
+        target = "Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider;getRenderer(Ljava/util/function/Consumer;Lnet/minecraft/client/renderer/rendertype/RenderType;)Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRenderer;"
     ))
     private RenderType seedAtlas$exploredOnlyAverage(RenderType type) {
         return ExploredTerrainRenderTypes.replace(type);
