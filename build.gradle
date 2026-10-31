@@ -253,6 +253,37 @@ tasks.register('xaeroCompatibilityTest', JavaExec) {
 }
 tasks.named('check') { dependsOn tasks.named('xaeroCompatibilityTest') }
 
+// The check above runs against the development (named) classes. Inside a running game both
+// Seed Atlas and Xaero are in the intermediary namespace, and that is where an obfuscated
+// release differs: Xaero's own members keep their names, but every Minecraft type it mentions
+// becomes class_xxx. This runs the same check on the shipped jar against the raw Xaero jar, so
+// that mismatch cannot ship unnoticed. 26.x never needed it because it is not obfuscated.
+def productionCompatClasses = layout.buildDirectory.dir('classes/productionCompatTest')
+tasks.register('compileProductionCompatTest', JavaCompile) {
+    dependsOn tasks.named('clientClasses')
+    source = fileTree('src/testProductionCompat/java') { include '**/*.java' }
+    classpath = sourceSets.client.compileClasspath + sourceSets.client.output
+    destinationDirectory = productionCompatClasses
+}
+tasks.register('productionCompatTest', JavaExec) {
+    // remapJar, not jar: only the remapped artifact is what a player installs.
+    dependsOn tasks.named('remapJar'), tasks.named('compileProductionCompatTest')
+    classpath = files(productionCompatClasses) + sourceSets.client.runtimeClasspath
+    mainClass = 'org.seedatlas.xaero.integration.ProductionCompatTest'
+    // -PshippedJar=<jar> re-checks an already published artifact, e.g. to confirm this test
+    // would have caught a regression that shipped.
+    def shippedOverride = providers.gradleProperty('shippedJar')
+    systemProperty 'seedatlas.shippedJar', shippedOverride.isPresent()
+        ? shippedOverride.get()
+        : tasks.named('remapJar').flatMap { it.archiveFile }.get().asFile
+    // The classpath holds Loom's remapped (named) copy; the game loads the original jar the
+    // dependency resolved from, which on an obfuscated release is intermediary.
+    systemProperty 'seedatlas.xaeroJar', configurations.modImplementation
+        .filter { it.name.contains('xaeroworldmap') }.singleFile
+}
+tasks.named('check') { dependsOn tasks.named('productionCompatTest') }
+tasks.named('check') { dependsOn tasks.named('xaeroCompatibilityTest') }
+
 // TEMP diagnostics
 gradle.projectsEvaluated {
     println "=== configs matching mod/client ==="

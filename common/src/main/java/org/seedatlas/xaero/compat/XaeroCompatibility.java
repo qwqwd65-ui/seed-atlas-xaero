@@ -51,16 +51,28 @@ public final class XaeroCompatibility {
         "org/seedatlas/xaero/integration/marker/SeedAtlasWaypointBridge");
     private static final String PROVIDER = "xaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider";
     private static final String RENDERER = "xaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRenderer";
+
     /**
-     * GuiMap's full-screen render entry point. Loom remaps Xaero into the named namespace, where
-     * 1.21.11 calls it render (26.x called the same method extractRenderState).
+     * Xaero's own members keep their names in both namespaces, but every Minecraft type it
+     * mentions is remapped: an obfuscated release such as 1.21.11 ships Xaero referring to
+     * {@code net/minecraft/class_4185}, while Loom presents it as
+     * {@code net/minecraft/client/gui/components/Button} in a development environment.
+     * The mixin-target checks below therefore cannot name a Minecraft type directly; they ask
+     * {@link #minecraft(String, String)} for the spelling this Xaero build actually uses.
+     * 26.x never needed this because it is not obfuscated.
      */
-    private static final String RENDER_METHOD = "render";
-    private static final String RENDER_DESCRIPTOR = "(Lnet/minecraft/client/gui/GuiGraphics;IIF)V";
-    /** Xaero clears its framebuffers through xaerolib, whose RenderTarget is intermediary class_276. */
-    private static final String CLEAR_RENDER_TARGET = "(Lcom/mojang/blaze3d/pipeline/RenderTarget;I)V";
-    private static final String GET_RENDERER =
-        "(Ljava/util/function/Consumer;Lnet/minecraft/client/renderer/rendertype/RenderType;)L" + RENDERER + ";";
+    private static final String NAMED_BUTTON = "net/minecraft/client/gui/components/Button";
+    private static final String NAMED_GUI_GRAPHICS = "net/minecraft/client/gui/GuiGraphics";
+    private static final String NAMED_POSE_STACK = "com/mojang/blaze3d/vertex/PoseStack";
+    private static final String NAMED_RENDER_TARGET = "com/mojang/blaze3d/pipeline/RenderTarget";
+    private static final String NAMED_RENDER_TYPE = "net/minecraft/client/renderer/rendertype/RenderType";
+
+    /**
+     * GuiMap's full-screen render entry point, keyed by the Minecraft method Xaero overrides.
+     * An obfuscated release keeps the intermediary name (method_25394) in the shipped jar.
+     */
+    private static final String RENDER_NAMED = "render";
+    private static final String RENDER_INTERMEDIARY = "method_25394";
 
     private static volatile Report current;
 
@@ -69,6 +81,8 @@ public final class XaeroCompatibility {
     private final List<String> problems = new ArrayList<>();
     private final List<String> warnings = new ArrayList<>();
     private final Set<String> checked = new LinkedHashSet<>();
+    /** Lazily detected; see {@link #intermediary()}. */
+    private Boolean intermediary;
 
     private XaeroCompatibility(ClassSource source) {
         this.source = source;
@@ -149,16 +163,18 @@ public final class XaeroCompatibility {
             }
             field(map, "shouldResetCameraPos", "Z", false);
             field(map, "attachedCamera", "Z", true);
-            field(map, "settingsButton", "Lnet/minecraft/client/gui/components/Button;", false);
-            method(map, "onSettingsButton", "(Lnet/minecraft/client/gui/components/Button;)V");
-            for (String name : List.of("init", "tick", "removed")) {
-                method(map, name, "()V");
-            }
-            MethodNode render = method(map, RENDER_METHOD, RENDER_DESCRIPTOR);
+            String button = minecraft(NAMED_BUTTON, "net/minecraft/class_4185");
+            field(map, "settingsButton", "L" + button + ";", false);
+            method(map, "onSettingsButton", "(L" + button + ";)V");
+            method(map, overrideName("init", "method_25426"), "()V");
+            method(map, overrideName("tick", "method_25393"), "()V");
+            method(map, overrideName("removed", "method_25432"), "()V");
+            MethodNode render = method(map, renderMethod(),
+                "(" + descriptor(NAMED_GUI_GRAPHICS, "net/minecraft/class_332") + "IIF)V");
             if (render != null) {
                 renderInjections(render);
-                require(invokes(render, PROVIDER, "getRenderer", GET_RENDERER),
-                    "GuiMap." + RENDER_METHOD + " no longer picks the explored terrain's render type");
+                require(invokes(render, PROVIDER, "getRenderer", getRenderer()),
+                    "GuiMap." + renderMethod() + " no longer picks the explored terrain's render type");
             }
             MethodNode zoom = method(map, "applyZoomLimits", "()V");
             if (zoom != null) {
@@ -169,14 +185,16 @@ public final class XaeroCompatibility {
         }
         ClassNode branch = xaeroClass("xaero/map/region/texture/BranchTextureRenderer");
         if (branch != null) {
+            String renderTarget = minecraft(NAMED_RENDER_TARGET, "net/minecraft/class_276");
+            String clearRenderTarget = "(L" + renderTarget + ";I)V";
             for (String name : List.of("ensureRenderTarget", "render")) {
                 require(branch.methods.stream().filter(m -> m.name.equals(name)
                         && invokes(m, "xaero/lib/client/graphics/util/TextureUtils", "clearRenderTarget",
-                            CLEAR_RENDER_TARGET)).count() == 1,
+                            clearRenderTarget)).count() == 1,
                     "BranchTextureRenderer." + name + " no longer clears unexplored terrain");
             }
             require(branch.methods.stream().filter(m -> m.name.equals("render")
-                    && invokes(m, PROVIDER, "getRenderer", GET_RENDERER)).count() == 1,
+                    && invokes(m, PROVIDER, "getRenderer", getRenderer())).count() == 1,
                 "BranchTextureRenderer.render no longer picks the branch render type");
         }
         ClassNode texture = xaeroClass("xaero/map/region/texture/BranchRegionTexture");
@@ -206,23 +224,23 @@ public final class XaeroCompatibility {
                 if (draws == 2) capturedLocals(render, instruction.getNext());
             }
         }
-        require(providers == 1, "GuiMap." + RENDER_METHOD + ": expected one biome background injection point, found " + providers);
-        require(draws >= 2, "GuiMap." + RENDER_METHOD + ": the terrain flush used by biome focus is missing");
+        require(providers == 1, "GuiMap." + renderMethod() + ": expected one biome background injection point, found " + providers);
+        require(draws >= 2, "GuiMap." + renderMethod() + ": the terrain flush used by biome focus is missing");
     }
 
     private void capturedLocals(MethodNode method, AbstractInsnNode injection) {
         if (method.localVariables == null) {
-            this.problems.add("GuiMap." + RENDER_METHOD + " has no local variable names to capture");
+            this.problems.add("GuiMap." + renderMethod() + " has no local variable names to capture");
             return;
         }
         int index = method.instructions.indexOf(injection);
         for (String name : List.of("matrixStack", "flooredCameraX", "flooredCameraZ")) {
-            String descriptor = name.equals("matrixStack") ? "Lcom/mojang/blaze3d/vertex/PoseStack;" : "I";
+            String descriptor = name.equals("matrixStack") ? descriptor(NAMED_POSE_STACK, "net/minecraft/class_4587") : "I";
             long matches = method.localVariables.stream().filter(local -> local.name.equals(name)
                 && local.desc.equals(descriptor)
                 && method.instructions.indexOf(local.start) <= index
                 && method.instructions.indexOf(local.end) > index).count();
-            require(matches == 1, "GuiMap." + RENDER_METHOD + ": captured local " + name + " is missing or ambiguous");
+            require(matches == 1, "GuiMap." + renderMethod() + ": captured local " + name + " is missing or ambiguous");
         }
     }
 
@@ -453,6 +471,46 @@ public final class XaeroCompatibility {
                 return Optional.empty();
             }
         }).orElse(null);
+    }
+
+    /**
+     * True when the Xaero classes under inspection are in the intermediary namespace, as they are
+     * inside a running game on an obfuscated Minecraft release. Detected from the one member whose
+     * type is unmistakable: {@code GuiMap.settingsButton} is either a named Button or class_4185.
+     */
+    private boolean intermediary() {
+        if (this.intermediary == null) {
+            ClassNode map = node("xaero/map/gui/GuiMap");
+            this.intermediary = map != null && map.fields.stream()
+                .anyMatch(f -> f.name.equals("settingsButton") && f.desc.contains("class_"));
+        }
+        return this.intermediary;
+    }
+
+    /** The spelling of a Minecraft type this Xaero build uses. */
+    private String minecraft(String named, String intermediaryName) {
+        return intermediary() ? intermediaryName : named;
+    }
+
+    /** The spelling of a Minecraft method override this Xaero build uses. */
+    private String overrideName(String named, String intermediaryName) {
+        return intermediary() ? intermediaryName : named;
+    }
+
+    /** GuiMap's full-screen render entry point in this Xaero build's namespace. */
+    private String renderMethod() {
+        return overrideName(RENDER_NAMED, RENDER_INTERMEDIARY);
+    }
+
+    /** The descriptor of one Minecraft type, in this Xaero build's namespace. */
+    private String descriptor(String named, String intermediaryName) {
+        return "L" + minecraft(named, intermediaryName) + ";";
+    }
+
+    /** getRenderer's signature in this Xaero build's namespace. */
+    private String getRenderer() {
+        return "(Ljava/util/function/Consumer;"
+            + descriptor(NAMED_RENDER_TYPE, "net/minecraft/class_1921") + ")L" + RENDERER + ";";
     }
 
     private static String simple(String internalName) {
