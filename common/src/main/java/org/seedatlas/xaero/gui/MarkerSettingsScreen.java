@@ -1,6 +1,6 @@
 package org.seedatlas.xaero.gui;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
@@ -63,15 +63,15 @@ public final class MarkerSettingsScreen extends SeedAtlasScreen {
 	}
 
 	@Override
-	public void extractRenderState(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float partialTick) {
-		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-		graphics.centeredText(this.font, this.title, this.width / 2, 8, 0xFFFFFFFF);
+	public void render(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTick) {
+		super.render(graphics, mouseX, mouseY, partialTick);
+		graphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFFFFFFF);
 		Component status = Component.translatable(
 			SeedAtlasClientState.config().structuresEnabled()
 			? "screen.seedatlas_xaero.markers.enabled"
 			: "screen.seedatlas_xaero.markers.disabled"
 		);
-		graphics.centeredText(this.font, status, this.width / 2, 23, 0xFFB8B8B8);
+		graphics.drawCenteredString(this.font, status, this.width / 2, 23, 0xFFB8B8B8);
 	}
 
 

@@ -1,6 +1,6 @@
 package org.seedatlas.xaero.gui;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.seedatlas.xaero.integration.SeedAtlasXaeroIntegration;
@@ -65,19 +65,19 @@ abstract class SeedAtlasScreen extends Screen implements IScreenBase {
 	}
 
 	@Override
-	public void extractBackground(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float a) {
+	public void renderBackground(final GuiGraphics graphics, final int mouseX, final int mouseY, final float a) {
 		Screen map = mapBehind();
 		if (map != null) {
 			if (map.width != this.width || map.height != this.height) {
 				map.init(this.width, this.height);
 			}
 			// The cursor stays off the map, so nothing on it reacts behind the menu.
-			map.extractRenderStateWithTooltipAndSubtitles(graphics, -1, -1, a);
+			map.renderWithTooltipAndSubtitles(graphics, -1, -1, a);
 			// Map terrain is drawn into its own target, so vanilla's world blur cannot dim it.
 			// Keep menu text readable over bright terrain, especially snow.
 			graphics.fill(0, 0, this.width, this.height, 0x88000000);
 		} else {
-			super.extractBackground(graphics, mouseX, mouseY, a);
+			super.renderBackground(graphics, mouseX, mouseY, a);
 		}
 	}
 }

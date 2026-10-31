@@ -2,7 +2,7 @@ package org.seedatlas.xaero.gui;
 
 import java.util.Locale;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -126,23 +126,23 @@ public final class SeedAtlasSettingsScreen extends SeedAtlasScreen {
 	}
 
 	@Override
-	public void extractRenderState(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float partialTick) {
-		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-		graphics.centeredText(this.font, this.title, this.width / 2, 14, -1);
+	public void render(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTick) {
+		super.render(graphics, mouseX, mouseY, partialTick);
+		graphics.drawCenteredString(this.font, this.title, this.width / 2, 14, -1);
 
 		int contentWidth = Math.min(340, this.width - 20);
 		int left = (this.width - contentWidth) / 2;
 		int fieldGap = 6;
 		int fieldWidth = (contentWidth - fieldGap * 2) / 3;
-		graphics.centeredText(this.font, Component.translatable("options.seedatlas_xaero.height.overworld"), left + fieldWidth / 2, 87, 0xFFA0A0A0);
-		graphics.centeredText(
+		graphics.drawCenteredString(this.font, Component.translatable("options.seedatlas_xaero.height.overworld"), left + fieldWidth / 2, 87, 0xFFA0A0A0);
+		graphics.drawCenteredString(
 			this.font,
 			Component.translatable("options.seedatlas_xaero.height.nether"),
 			left + fieldWidth + fieldGap + fieldWidth / 2,
 			87,
 			0xFFA0A0A0
 		);
-		graphics.centeredText(
+		graphics.drawCenteredString(
 			this.font,
 			Component.translatable("options.seedatlas_xaero.height.end"),
 			left + (fieldWidth + fieldGap) * 2 + fieldWidth / 2,
@@ -150,7 +150,7 @@ public final class SeedAtlasSettingsScreen extends SeedAtlasScreen {
 			0xFFA0A0A0
 		);
 
-		graphics.centeredText(this.font, seedStatus(), this.width / 2, this.height - 42, 0xFFA0A0A0);
+		graphics.drawCenteredString(this.font, seedStatus(), this.width / 2, this.height - 42, 0xFFA0A0A0);
 	}
 
 	@Override

@@ -1,18 +1,16 @@
 package org.seedatlas.xaero.integration;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.platform.SourceFactor;
 import com.mojang.blaze3d.platform.DestFactor;
+import com.mojang.blaze3d.platform.SourceFactor;
 import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.DepthStencilState;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.shaders.UniformType;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.AddressMode;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuSampler;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import java.util.OptionalDouble;
 import java.util.function.Supplier;
 import net.minecraft.client.renderer.rendertype.RenderSetup;
@@ -28,10 +26,19 @@ import xaero.map.graphics.CustomRenderTypes;
  * Xaero's render types for explored terrain and its zoomed-out textures, with fragment shaders that
  * leave unexplored texels out of filtering. Xaero's own blend them in as black, which only shows once
  * the seed layer, not black, surrounds the explored terrain.
+ *
+ * <p>1.21.11 still folds blend and depth state into {@link RenderPipeline} itself: there is one
+ * {@code withBlend(BlendFunction)} and no separate colour-target or depth-stencil state objects, so
+ * both types are built from the same pipeline builder and differ only in their blend function.
  */
 public final class ExploredTerrainRenderTypes {
     private static final Supplier<GpuSampler> NEAREST = () -> RenderSystem.getDevice()
         .createSampler(AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE, FilterMode.NEAREST, FilterMode.NEAREST, 1, OptionalDouble.of(0.0));
+
+    /** Xaero's map writes its colour and keeps the target's alpha. */
+    private static final BlendFunction KEEP_DEST_ALPHA =
+        new BlendFunction(SourceFactor.ONE, DestFactor.ZERO, SourceFactor.ZERO, DestFactor.ONE);
+
     private static RenderType map;
     private static RenderType branch;
 
@@ -57,11 +64,8 @@ public final class ExploredTerrainRenderTypes {
                 .withSampler("Sampler0")
                 .withUniform(BuiltInCustomUniforms.BRIGHTNESS.name(), BuiltInCustomUniforms.BRIGHTNESS.type())
                 .withUniform(BuiltInCustomUniforms.WITH_LIGHT.name(), BuiltInCustomUniforms.WITH_LIGHT.type())
-                // Xaero's map writes its colour and keeps the target's alpha.
-                .withColorTargetState(new ColorTargetState(
-                    new BlendFunction(SourceFactor.ONE, DestFactor.ZERO, SourceFactor.ZERO, DestFactor.ONE)))
+                .withBlend(KEEP_DEST_ALPHA)
                 .withCull(false)
-                .withDepthStencilState(DepthStencilState.DEFAULT)
                 .build();
             map = XaeroRenderType.createRenderType("seedatlas_explored_map",
                 RenderSetup.builder(pipeline).withTexture("Sampler0", WorldMap.guiTextures, NEAREST));
@@ -79,7 +83,6 @@ public final class ExploredTerrainRenderTypes {
                 .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
                 .withUniform("Projection", UniformType.UNIFORM_BUFFER)
                 .withSampler("Sampler0")
-                .withColorTargetState(ColorTargetState.DEFAULT)
                 .withCull(false)
                 .build();
             branch = XaeroRenderType.createRenderType("seedatlas_explored_map_branch",
@@ -87,5 +90,4 @@ public final class ExploredTerrainRenderTypes {
         }
         return branch;
     }
-
 }

@@ -425,7 +425,7 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
         trimTextureCache(protectedTileKeys(this.context.slices));
 
         MultiTextureRenderTypeRenderer renderer =
-            rendererProvider.getRenderer(CustomRenderTypes.GUI_NEAREST);
+            rendererProvider.getRenderer(texture -> { }, CustomRenderTypes.GUI_NEAREST);
         Matrix4f matrix = pose.last().pose();
         float alpha = focused ? 1.0F : SeedAtlasClientState.config().opacityFraction();
         float depth = focused || overlayExplored ? 1.0F : -1.0F;
@@ -439,7 +439,7 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
             float u1 = slice.u1 / textureSize;
             float v0 = slice.v0 / textureSize;
             float v1 = slice.v1 / textureSize;
-            BufferBuilder buffer = renderer.begin(slice.source.texture.getTextureView());
+            BufferBuilder buffer = renderer.begin(slice.source.texture.getTexture());
             // Terrain is at Z=0; the focus pass must cover explored terrain as well.
             buffer.addVertex(matrix, left, bottom, depth)
                 .setColor(1.0F, 1.0F, 1.0F, alpha).setUv(u0, v1);

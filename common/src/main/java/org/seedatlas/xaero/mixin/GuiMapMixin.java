@@ -25,7 +25,7 @@ import xaero.map.gui.GuiMap;
 import xaero.map.gui.TooltipButton;
 
 /** Full-map-only controls and lifecycle gate for the seed layer. */
-@Mixin(value = GuiMap.class, remap = false)
+@Mixin(value = GuiMap.class)
 abstract class GuiMapMixin {
     /** Xaero's own bound with its "Unlimited zoom out" option: one pixel for 512 blocks. */
     @Unique
@@ -59,7 +59,7 @@ abstract class GuiMapMixin {
     private long seedAtlas$displayedRevision = Long.MIN_VALUE;
 
     // Draw before Xaero reserves both renderers in its shared provider.
-    @Inject(method = "extractRenderState", at = @At(
+    @Inject(method = "render", at = @At(
         value = "INVOKE",
         target = "Lxaero/map/MapProcessor;getMultiTextureRenderTypeRenderers()Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider;"
     ))
@@ -80,7 +80,7 @@ abstract class GuiMapMixin {
 
     // Both terrain batches have been flushed and released. Use the same FBO and pose,
     // before grids, waypoints and structure markers, so explored blocks cannot hide focus.
-    @Inject(method = "extractRenderState", at = @At(
+    @Inject(method = "render", at = @At(
         value = "INVOKE",
         target = "Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider;draw(Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRenderer;)V",
         ordinal = 1, shift = At.Shift.AFTER
@@ -101,9 +101,9 @@ abstract class GuiMapMixin {
     }
 
     // Unexplored texels must not darken explored terrain where the seed layer surrounds it.
-    @ModifyArg(method = "extractRenderState", at = @At(
+    @ModifyArg(method = "render", at = @At(
         value = "INVOKE",
-        target = "Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider;getRenderer(Lnet/minecraft/client/renderer/rendertype/RenderType;)Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRenderer;"
+        target = "Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider;getRenderer(Ljava/util/function/Consumer;Lnet/minecraft/client/renderer/rendertype/RenderType;)Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRenderer;"
     ))
     private RenderType seedAtlas$exploredTerrainType(RenderType type) {
         return ExploredTerrainRenderTypes.replace(type);

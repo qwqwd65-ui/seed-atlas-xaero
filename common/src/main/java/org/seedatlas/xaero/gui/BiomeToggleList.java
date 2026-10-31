@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -71,8 +71,8 @@ final class BiomeToggleList extends AbstractWidget {
 	}
 
 	@Override
-	protected void extractWidgetRenderState(
-		final GuiGraphicsExtractor graphics,
+	protected void renderWidget(
+		final GuiGraphics graphics,
 		final int mouseX,
 		final int mouseY,
 		final float partialTick
@@ -80,7 +80,7 @@ final class BiomeToggleList extends AbstractWidget {
 		clampScroll();
 
 		graphics.fill(this.getX(), this.getY(), this.getRight(), this.getBottom(), 0xD0121212);
-		graphics.outline(this.getX(), this.getY(), this.getWidth(), this.getHeight(), 0xFF5A5A5A);
+		graphics.renderOutline(this.getX(), this.getY(), this.getWidth(), this.getHeight(), 0xFF5A5A5A);
 		graphics.fill(this.getX(), this.getY(), this.getRight(), this.getY() + 1, 0xFF888888);
 		graphics.fill(this.getX(), this.getBottom() - 1, this.getRight(), this.getBottom(), 0xFF303030);
 
@@ -181,7 +181,7 @@ final class BiomeToggleList extends AbstractWidget {
 		this.defaultButtonNarrationText(output);
 	}
 
-	private void renderScrollbar(final GuiGraphicsExtractor graphics) {
+	private void renderScrollbar(final GuiGraphics graphics) {
 		int max = maxScroll();
 		if (max <= 0) {
 			return;
@@ -258,7 +258,7 @@ final class BiomeToggleList extends AbstractWidget {
 		}
 
 		private void render(
-			final GuiGraphicsExtractor graphics,
+			final GuiGraphics graphics,
 			final int x,
 			final int y,
 			final int width,
@@ -288,13 +288,13 @@ final class BiomeToggleList extends AbstractWidget {
 			this.toggle.active = BiomeToggleList.this.actionsEnabled.getAsBoolean();
 			// Minecraft 26.2: setRectangle(width, height, x, y)
 			this.toggle.setRectangle(TOGGLE_WIDTH, TOGGLE_HEIGHT, toggleX, toggleY);
-			this.toggle.extractRenderState(graphics, mouseX, mouseY, partialTick);
+			this.toggle.render(graphics, mouseX, mouseY, partialTick);
 
 			int nameX = x + 6 + ICON_SIZE + 8;
 			int available = Math.max(0, toggleX - 8 - nameX);
 			FormattedCharSequence name = clippedName(SeedAtlasXaeroIntegration.biomeDisplayName(this.marker.name()), available);
 			int nameY = y + (ROW_HEIGHT - BiomeToggleList.this.minecraft.font.lineHeight) / 2;
-			graphics.text(BiomeToggleList.this.minecraft.font, name, nameX, nameY, 0xFFFFFFFF);
+			graphics.drawString(BiomeToggleList.this.minecraft.font, name, nameX, nameY, 0xFFFFFFFF);
 		}
 
 		private FormattedCharSequence clippedName(final Component name, final int availableWidth) {

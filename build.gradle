@@ -1,5 +1,7 @@
 plugins {
-	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	// 26.x 是非混淆版本，上游用的是 no-remap 标记插件 'net.fabricmc.fabric-loom'。
+	// 1.21.11 仍然混淆，必须用会做重映射的经典 'fabric-loom' 插件。
+	id 'fabric-loom' version "${loom_version}"
 	id 'maven-publish'
 }
 
@@ -35,14 +37,25 @@ sourceSets.main.resources.srcDir 'common/src/main/resources'
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	// 26.x ships unobfuscated, so upstream never needed this. 1.21.11 is still
+	// obfuscated: without official mappings Loom cannot resolve Minecraft names
+	// and rejects Fabric API's intermediary access wideners.
+	mappings loom.officialMojangMappings()
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
-	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// Classic Loom remaps: Fabric API must be modImplementation, not implementation.
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	// Xaero's World Map is a required external mod. It is never bundled into
 	// the produced jar.
-	clientImplementation "xaero.map:xaeroworldmap-fabric-${project.minecraft_version}:${project.xaero_world_map_version}"
+	//
+	// 1.21.11 is still obfuscated, so Xaero ships intermediary bytecode: its own
+	// names survive, but every Minecraft method it overrides is called by its
+	// intermediary name. modImplementation runs the jar through Loom's remapper
+	// so those overrides resolve against named Minecraft sources, and mixin
+	// refmaps can map our injection targets back to intermediary.
+	modImplementation "xaero.map:xaeroworldmap-fabric-${project.minecraft_version}:${project.xaero_world_map_version}"
 }
 
 processResources {
@@ -56,8 +69,11 @@ processResources {
 	}
 }
 
+// Minecraft 1.21.11 ships a Java 21 runtime, but the native binding uses
+// java.lang.foreign, final only from 22 on. Targeting 22 keeps the mod runnable
+// on any Java 22+ runtime without preview flags.
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 25
+	it.options.release = 22
 }
 
 java {
@@ -66,8 +82,8 @@ java {
 	// If you remove this line, sources will not be generated.
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_25
-	targetCompatibility = JavaVersion.VERSION_25
+	sourceCompatibility = JavaVersion.VERSION_22
+	targetCompatibility = JavaVersion.VERSION_22
 }
 
 jar {
@@ -236,3 +252,10 @@ tasks.register('xaeroCompatibilityTest', JavaExec) {
     if (compatJar.isPresent()) systemProperty 'seedatlas.xaeroJar', compatJar.get()
 }
 tasks.named('check') { dependsOn tasks.named('xaeroCompatibilityTest') }
+
+// TEMP diagnostics
+gradle.projectsEvaluated {
+    println "=== configs matching mod/client ==="
+    configurations.names.findAll { it.toLowerCase().contains('mod') || it.toLowerCase().contains('client') }
+        .sort().each { println "  " + it }
+}

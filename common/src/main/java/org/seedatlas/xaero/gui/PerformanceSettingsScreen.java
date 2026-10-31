@@ -1,6 +1,6 @@
 package org.seedatlas.xaero.gui;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
@@ -46,12 +46,12 @@ public final class PerformanceSettingsScreen extends SeedAtlasScreen {
 	}
 
 	@Override
-	public void extractRenderState(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float partialTick) {
-		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-		graphics.centeredText(this.font, this.title, this.width / 2, 14, -1);
+	public void render(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTick) {
+		super.render(graphics, mouseX, mouseY, partialTick);
+		graphics.drawCenteredString(this.font, this.title, this.width / 2, 14, -1);
 		int contentWidth = Math.min(340, this.width - 20);
 		int left = (this.width - contentWidth) / 2;
-		graphics.textWithWordWrap(
+		graphics.drawWordWrap(
 			this.font,
 			Component.translatable("screen.seedatlas_xaero.performance.description"),
 			left,

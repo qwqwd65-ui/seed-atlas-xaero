@@ -471,7 +471,7 @@ public final class SeedAtlasClientState {
 		if (!SeedAtlasXaero.xaeroCompatible()) {
 			// The settings drive the Xaero integration, which stays off for this Xaero version.
 			if (Minecraft.getInstance().player != null) {
-				Minecraft.getInstance().player.sendSystemMessage(SeedAtlasXaero.incompatibleMessage());
+				Minecraft.getInstance().player.displayClientMessage(SeedAtlasXaero.incompatibleMessage(), false);
 			}
 			return;
 		}
@@ -563,7 +563,7 @@ public final class SeedAtlasClientState {
 		if (server == null) {
 			return OptionalLong.empty();
 		}
-		return OptionalLong.of(server.getWorldGenSettings().options().seed());
+		return OptionalLong.of(server.getWorldData().worldGenOptions().seed());
 	}
 
 	private static String digest(final String input) {

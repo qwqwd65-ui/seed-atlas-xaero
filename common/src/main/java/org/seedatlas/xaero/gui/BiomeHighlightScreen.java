@@ -2,7 +2,7 @@ package org.seedatlas.xaero.gui;
 
 import java.util.Comparator;
 import java.util.List;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -60,17 +60,17 @@ public final class BiomeHighlightScreen extends SeedAtlasScreen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-        graphics.centeredText(this.font, this.title, this.width / 2, 8, 0xFFFFFFFF);
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.render(graphics, mouseX, mouseY, partialTick);
+        graphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFFFFFFF);
         Component status = Component.translatable(
             SeedAtlasClientState.config().biomeHighlightEnabled()
                 ? "screen.seedatlas_xaero.biome_highlights.selected"
                 : "screen.seedatlas_xaero.biome_highlights.disabled",
             SeedAtlasClientState.config().highlightedBiomeCount());
-        graphics.centeredText(this.font, status, this.width / 2, 23, 0xFFB8B8B8);
+        graphics.drawCenteredString(this.font, status, this.width / 2, 23, 0xFFB8B8B8);
         if (this.biomes.isEmpty()) {
-            graphics.centeredText(this.font,
+            graphics.drawCenteredString(this.font,
                 Component.translatable("screen.seedatlas_xaero.biome_highlights.no_seed"),
                 this.width / 2, HEADER_HEIGHT + 16, 0xFFB8B8B8);
         }

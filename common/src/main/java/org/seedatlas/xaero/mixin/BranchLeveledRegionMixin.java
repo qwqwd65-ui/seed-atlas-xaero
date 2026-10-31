@@ -10,7 +10,7 @@ import xaero.map.file.MapSaveLoad;
 import xaero.map.region.BranchLeveledRegion;
 
 /** Zoomed-out textures cached with dark seams are rebuilt once. */
-@Mixin(value = BranchLeveledRegion.class, remap = false)
+@Mixin(BranchLeveledRegion.class)
 abstract class BranchLeveledRegionMixin {
     @Inject(method = "findCacheFile", at = @At("RETURN"))
     private void seedAtlas$rebuildSeamedTextures(MapSaveLoad mapSaveLoad, CallbackInfoReturnable<File> cir) {

@@ -59,7 +59,7 @@ public final class SeedAtlasStructureRenderer extends ElementRenderer<
             Math.min(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight())
         );
         // PNGs use straight alpha. Nearest sampling keeps the original pixel-art edges crisp.
-        this.context.batchedIcons = rendererProvider.getRenderer(CustomRenderTypes.GUI_NEAREST);
+        this.context.batchedIcons = rendererProvider.getRenderer(texture -> { }, CustomRenderTypes.GUI_NEAREST);
         this.source.request(
             this.context,
             renderInfo.mapDimension,
@@ -142,7 +142,7 @@ public final class SeedAtlasStructureRenderer extends ElementRenderer<
             layout.displayWidth(), layout.displayHeight(),
             layout.width(), layout.height(),
             1.0F, 1.0F, 1.0F, alpha, layout.textureWidth(), layout.textureHeight(),
-            Minecraft.getInstance().getTextureManager().getTexture(icon.texture()).getTextureView()
+            Minecraft.getInstance().getTextureManager().getTexture(icon.texture()).getTexture()
         );
         if (completed) {
             // Badge on the lower right corner, drawn right after the icon so it stays on top.
@@ -154,7 +154,7 @@ public final class SeedAtlasStructureRenderer extends ElementRenderer<
                 CompletedBadge.SOURCE_SIZE, CompletedBadge.SOURCE_SIZE,
                 1.0F, 1.0F, 1.0F, alpha,
                 CompletedBadge.SOURCE_SIZE, CompletedBadge.SOURCE_SIZE,
-                Minecraft.getInstance().getTextureManager().getTexture(CompletedBadge.TEXTURE).getTextureView()
+                Minecraft.getInstance().getTextureManager().getTexture(CompletedBadge.TEXTURE).getTexture()
             );
         }
         return false;

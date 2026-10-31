@@ -18,7 +18,7 @@ import net.minecraft.world.level.levelgen.carver.ConfiguredWorldCarver;
 import org.seedatlas.xaero.nativeapi.SeedAtlasNative;
 import org.seedatlas.xaero.nativeapi.WorldType;
 
-/** Offline 26.1.2 carver and native-floor checks; no world, chunk or client startup. */
+/** Offline 1.21.11 carver and native-floor checks; no world, chunk or client startup. */
 public final class NetherCaveMaskTest {
     private static final long SEED = 2842062689604764280L;
 
@@ -26,14 +26,14 @@ public final class NetherCaveMaskTest {
         invalidAreas(); // Invalid inputs must fail even before Minecraft registries exist.
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
-        check(SharedConstants.getCurrentVersion().name().equals("26.1.2"), "Requires Minecraft 26.1.2");
+        check(SharedConstants.getCurrentVersion().name().equals("1.21.11"), "Requires Minecraft 1.21.11");
         identicalVanillaCarvers();
         knownColumnAndNativeFloor();
         samplingAndHaloConsistency();
         seedAndResultIsolation();
         concurrentReads();
         boundedCache();
-        System.out.println("Nether cave masks: 7 test groups passed (vanilla 26.1.2 + native integration)");
+        System.out.println("Nether cave masks: 7 test groups passed (vanilla 1.21.11 + native integration)");
         if (Arrays.asList(args).contains("--benchmark")) benchmark();
     }
 

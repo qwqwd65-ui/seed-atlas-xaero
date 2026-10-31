@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import xaero.map.region.texture.BranchRegionTexture;
 
 /** Also handle zoom textures cached before transparent unknown quadrants. */
-@Mixin(value = BranchRegionTexture.class, remap = false)
+@Mixin(BranchRegionTexture.class)
 abstract class BranchRegionTextureMixin {
     @Inject(method = "readCacheData", at = @At("RETURN"))
     private void seedAtlas$restoreUnknownTransparency(CallbackInfo ci) {

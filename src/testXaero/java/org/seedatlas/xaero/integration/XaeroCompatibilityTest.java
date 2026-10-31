@@ -40,13 +40,13 @@ public final class XaeroCompatibilityTest {
         check(report.warnings().isEmpty(), "No optional feature may be lost with the compiled Xaero version");
         everyXaeroUserIsChecked(report);
 
-        breaks(installed, "xaero/map/gui/GuiMap", node -> method(node, "extractRenderState").localVariables
+        breaks(installed, "xaero/map/gui/GuiMap", node -> method(node, "render").localVariables
             .forEach(local -> { if (local.name.equals("flooredCameraX")) local.name = "cameraBlockX"; }), "flooredCameraX");
         breaks(installed, "xaero/map/gui/GuiMap", node -> node.fields.removeIf(f -> f.name.equals("attachedCamera")),
             "attachedCamera");
         breaks(installed, "xaero/map/gui/GuiMap", node -> method(node, "applyZoomLimits").localVariables
             .forEach(local -> { if (local.name.equals("minScale")) local.name = "minimumScale"; }), "minScale");
-        breaks(installed, "xaero/map/gui/GuiMap", node -> removeRendererCalls(method(node, "extractRenderState")),
+        breaks(installed, "xaero/map/gui/GuiMap", node -> removeRendererCalls(method(node, "render")),
             "explored terrain's render type");
         breaks(installed, "xaero/map/region/texture/BranchTextureRenderer",
             node -> removeRendererCalls(method(node, "render")), "branch render type");

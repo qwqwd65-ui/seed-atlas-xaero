@@ -97,7 +97,7 @@ public final class NetherCaveMask {
                 int index = 0;
                 for (var holder : Vanilla.CARVERS) {
                     var carver = holder.value();
-                    random.setLargeFeatureSeed(key.seed + index++, source.x(), source.z());
+                    random.setLargeFeatureSeed(key.seed + index++, source.x, source.z);
                     if (carver.isStartChunk(random)) {
                         if (!(carver.worldCarver() instanceof NetherWorldCarver)
                                 || !(carver.config() instanceof CaveCarverConfiguration configuration)) {

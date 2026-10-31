@@ -33,7 +33,7 @@ public final class SeedAtlasXaero {
             SeedAtlasXaeroIntegration.tickBackground(client);
         } else if (!incompatibilityShown && client.player != null) {
             incompatibilityShown = true;
-            client.player.sendSystemMessage(incompatibleMessage());
+            client.player.displayClientMessage(incompatibleMessage(), false);
         }
     }
 

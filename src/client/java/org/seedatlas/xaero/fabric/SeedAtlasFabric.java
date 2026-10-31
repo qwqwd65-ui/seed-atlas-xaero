@@ -18,7 +18,7 @@ import org.seedatlas.xaero.integration.icon.StructureIcons;
 public final class SeedAtlasFabric implements ClientModInitializer {
     @Override public void onInitializeClient() {
         SeedAtlasXaero.initialize(FabricLoader.getInstance().getConfigDir());
-        ResourceLoader.get(PackType.CLIENT_RESOURCES).registerReloadListener(
+        ResourceLoader.get(PackType.CLIENT_RESOURCES).registerReloader(
             Identifier.fromNamespaceAndPath(SeedAtlasXaero.MOD_ID, "structure_icons"), StructureIcons.reloadListener());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) ->
             SeedAtlasCommands.register(dispatcher, Source::new));

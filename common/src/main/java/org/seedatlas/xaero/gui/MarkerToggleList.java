@@ -9,7 +9,7 @@ import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -93,8 +93,8 @@ final class MarkerToggleList extends AbstractWidget {
 	}
 
 	@Override
-	protected void extractWidgetRenderState(
-		final GuiGraphicsExtractor graphics,
+	protected void renderWidget(
+		final GuiGraphics graphics,
 		final int mouseX,
 		final int mouseY,
 		final float partialTick
@@ -102,7 +102,7 @@ final class MarkerToggleList extends AbstractWidget {
 		clampScroll();
 
 		graphics.fill(this.getX(), this.getY(), this.getRight(), this.getBottom(), 0xD0121212);
-		graphics.outline(this.getX(), this.getY(), this.getWidth(), this.getHeight(), 0xFF5A5A5A);
+		graphics.renderOutline(this.getX(), this.getY(), this.getWidth(), this.getHeight(), 0xFF5A5A5A);
 		graphics.fill(this.getX(), this.getY(), this.getRight(), this.getY() + 1, 0xFF888888);
 		graphics.fill(this.getX(), this.getBottom() - 1, this.getRight(), this.getBottom(), 0xFF303030);
 
@@ -211,7 +211,7 @@ final class MarkerToggleList extends AbstractWidget {
 		this.defaultButtonNarrationText(output);
 	}
 
-	private void renderScrollbar(final GuiGraphicsExtractor graphics) {
+	private void renderScrollbar(final GuiGraphics graphics) {
 		int max = maxScroll();
 		if (max <= 0) {
 			return;
@@ -290,7 +290,7 @@ final class MarkerToggleList extends AbstractWidget {
 		}
 
 		private void render(
-			final GuiGraphicsExtractor graphics,
+			final GuiGraphics graphics,
 			final int x,
 			final int y,
 			final int width,
@@ -333,7 +333,7 @@ final class MarkerToggleList extends AbstractWidget {
 			this.toggle.active = MarkerToggleList.this.actionsEnabled.getAsBoolean();
 			// Minecraft 26.2: setRectangle(width, height, x, y)
 			this.toggle.setRectangle(TOGGLE_WIDTH, TOGGLE_HEIGHT, toggleX, toggleY);
-			this.toggle.extractRenderState(graphics, mouseX, mouseY, partialTick);
+			this.toggle.render(graphics, mouseX, mouseY, partialTick);
 
 			int nameRight = toggleX;
 			if (MarkerToggleList.this.resetCompleted != null) {
@@ -341,7 +341,7 @@ final class MarkerToggleList extends AbstractWidget {
 				int resetX = toggleX - RESET_WIDTH - 4;
 				this.reset.active = completed > 0;
 				this.reset.setRectangle(RESET_WIDTH, TOGGLE_HEIGHT, resetX, toggleY);
-				this.reset.extractRenderState(graphics, mouseX, mouseY, partialTick);
+				this.reset.render(graphics, mouseX, mouseY, partialTick);
 				// The completed badge and how many of this type are completed.
 				var font = MarkerToggleList.this.minecraft.font;
 				String count = Integer.toString(completed);
@@ -350,7 +350,7 @@ final class MarkerToggleList extends AbstractWidget {
 				int badgeY = toggleY + (TOGGLE_HEIGHT - CompletedBadge.SOURCE_SIZE) / 2;
 				graphics.blit(RenderPipelines.GUI_TEXTURED, CompletedBadge.TEXTURE, badgeX, badgeY, 0.0F, 0.0F,
 					CompletedBadge.SOURCE_SIZE, CompletedBadge.SOURCE_SIZE, CompletedBadge.SOURCE_SIZE, CompletedBadge.SOURCE_SIZE);
-				graphics.text(font, count, badgeX + CompletedBadge.SOURCE_SIZE + 3,
+				graphics.drawString(font, count, badgeX + CompletedBadge.SOURCE_SIZE + 3,
 					toggleY + (TOGGLE_HEIGHT - font.lineHeight) / 2 + 1, completed > 0 ? 0xFFFFFFFF : 0xFFA0A0A0);
 				if (completed == 0) {
 					graphics.fill(badgeX, badgeY, badgeX + CompletedBadge.SOURCE_SIZE, badgeY + CompletedBadge.SOURCE_SIZE, 0x90303030);
@@ -367,7 +367,7 @@ final class MarkerToggleList extends AbstractWidget {
 			int available = Math.max(0, nameRight - 8 - nameX);
 			FormattedCharSequence name = clippedName(this.marker.displayName(), available);
 			int nameY = y + (ROW_HEIGHT - MarkerToggleList.this.minecraft.font.lineHeight) / 2;
-			graphics.text(MarkerToggleList.this.minecraft.font, name, nameX, nameY, 0xFFFFFFFF);
+			graphics.drawString(MarkerToggleList.this.minecraft.font, name, nameX, nameY, 0xFFFFFFFF);
 		}
 
 		private FormattedCharSequence clippedName(final Component name, final int availableWidth) {

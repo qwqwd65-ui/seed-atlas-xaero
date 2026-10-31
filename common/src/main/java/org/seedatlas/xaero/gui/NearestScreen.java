@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -155,12 +155,12 @@ public final class NearestScreen extends SeedAtlasScreen {
 	}
 
 	@Override
-	public void extractRenderState(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float partialTick) {
-		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-		graphics.centeredText(this.font, this.title, this.width / 2, 8, 0xFFFFFFFF);
-		graphics.centeredText(this.font, this.status, this.width / 2, 24, 0xFFB8B8B8);
+	public void render(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTick) {
+		super.render(graphics, mouseX, mouseY, partialTick);
+		graphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFFFFFFF);
+		graphics.drawCenteredString(this.font, this.status, this.width / 2, 24, 0xFFB8B8B8);
 		if (this.noSeed) {
-			graphics.centeredText(this.font, Component.translatable("screen.seedatlas_xaero.no_seed"), this.width / 2, 100, 0xFFB8B8B8);
+			graphics.drawCenteredString(this.font, Component.translatable("screen.seedatlas_xaero.no_seed"), this.width / 2, 100, 0xFFB8B8B8);
 		}
 	}
 

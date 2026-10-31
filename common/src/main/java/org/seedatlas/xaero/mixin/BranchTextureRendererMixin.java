@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import xaero.map.region.texture.BranchTextureRenderer;
 
 /** Keep unknown quadrants transparent, and unknown texels out of the average, when Xaero builds zoomed-out textures. */
-@Mixin(value = BranchTextureRenderer.class, remap = false)
+@Mixin(BranchTextureRenderer.class)
 abstract class BranchTextureRendererMixin {
     @ModifyArg(method = {"ensureRenderTarget", "render"}, at = @At(
         value = "INVOKE",

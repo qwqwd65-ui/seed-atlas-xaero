@@ -51,7 +51,16 @@ public final class XaeroCompatibility {
         "org/seedatlas/xaero/integration/marker/SeedAtlasWaypointBridge");
     private static final String PROVIDER = "xaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider";
     private static final String RENDERER = "xaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRenderer";
-    private static final String GET_RENDERER = "(Lnet/minecraft/client/renderer/rendertype/RenderType;)L" + RENDERER + ";";
+    /**
+     * GuiMap's full-screen render entry point. Loom remaps Xaero into the named namespace, where
+     * 1.21.11 calls it render (26.x called the same method extractRenderState).
+     */
+    private static final String RENDER_METHOD = "render";
+    private static final String RENDER_DESCRIPTOR = "(Lnet/minecraft/client/gui/GuiGraphics;IIF)V";
+    /** Xaero clears its framebuffers through xaerolib, whose RenderTarget is intermediary class_276. */
+    private static final String CLEAR_RENDER_TARGET = "(Lcom/mojang/blaze3d/pipeline/RenderTarget;I)V";
+    private static final String GET_RENDERER =
+        "(Ljava/util/function/Consumer;Lnet/minecraft/client/renderer/rendertype/RenderType;)L" + RENDERER + ";";
 
     private static volatile Report current;
 
@@ -145,12 +154,11 @@ public final class XaeroCompatibility {
             for (String name : List.of("init", "tick", "removed")) {
                 method(map, name, "()V");
             }
-            MethodNode render = method(map, "extractRenderState",
-                "(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIF)V");
+            MethodNode render = method(map, RENDER_METHOD, RENDER_DESCRIPTOR);
             if (render != null) {
                 renderInjections(render);
                 require(invokes(render, PROVIDER, "getRenderer", GET_RENDERER),
-                    "GuiMap.extractRenderState no longer picks the explored terrain's render type");
+                    "GuiMap." + RENDER_METHOD + " no longer picks the explored terrain's render type");
             }
             MethodNode zoom = method(map, "applyZoomLimits", "()V");
             if (zoom != null) {
@@ -164,7 +172,7 @@ public final class XaeroCompatibility {
             for (String name : List.of("ensureRenderTarget", "render")) {
                 require(branch.methods.stream().filter(m -> m.name.equals(name)
                         && invokes(m, "xaero/lib/client/graphics/util/TextureUtils", "clearRenderTarget",
-                            "(Lcom/mojang/blaze3d/pipeline/RenderTarget;I)V")).count() == 1,
+                            CLEAR_RENDER_TARGET)).count() == 1,
                     "BranchTextureRenderer." + name + " no longer clears unexplored terrain");
             }
             require(branch.methods.stream().filter(m -> m.name.equals("render")
@@ -179,10 +187,10 @@ public final class XaeroCompatibility {
         ClassNode branchRegion = xaeroClass("xaero/map/region/BranchLeveledRegion");
         if (branchRegion != null) method(branchRegion, "findCacheFile", "(Lxaero/map/file/MapSaveLoad;)Ljava/io/File;");
         ClassNode clientOnly = xaeroClass("xaero/map/WorldMapClientOnly");
-        if (clientOnly != null) method(clientOnly, "loadLaterClientRender", "()V");
+        if (clientOnly != null) method(clientOnly, "postInit", "()V");
     }
 
-    /** Both GuiMapMixin injections into extractRenderState, including the locals they capture. */
+    /** Both GuiMapMixin injections into GuiMap's render method, including the locals they capture. */
     private void renderInjections(MethodNode render) {
         int providers = 0;
         int draws = 0;
@@ -198,13 +206,13 @@ public final class XaeroCompatibility {
                 if (draws == 2) capturedLocals(render, instruction.getNext());
             }
         }
-        require(providers == 1, "GuiMap.extractRenderState: expected one biome background injection point, found " + providers);
-        require(draws >= 2, "GuiMap.extractRenderState: the terrain flush used by biome focus is missing");
+        require(providers == 1, "GuiMap." + RENDER_METHOD + ": expected one biome background injection point, found " + providers);
+        require(draws >= 2, "GuiMap." + RENDER_METHOD + ": the terrain flush used by biome focus is missing");
     }
 
     private void capturedLocals(MethodNode method, AbstractInsnNode injection) {
         if (method.localVariables == null) {
-            this.problems.add("GuiMap.extractRenderState has no local variable names to capture");
+            this.problems.add("GuiMap." + RENDER_METHOD + " has no local variable names to capture");
             return;
         }
         int index = method.instructions.indexOf(injection);
@@ -214,7 +222,7 @@ public final class XaeroCompatibility {
                 && local.desc.equals(descriptor)
                 && method.instructions.indexOf(local.start) <= index
                 && method.instructions.indexOf(local.end) > index).count();
-            require(matches == 1, "GuiMap.extractRenderState: captured local " + name + " is missing or ambiguous");
+            require(matches == 1, "GuiMap." + RENDER_METHOD + ": captured local " + name + " is missing or ambiguous");
         }
     }
 

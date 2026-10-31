@@ -3,7 +3,7 @@ package org.seedatlas.xaero.gui;
 import java.util.ArrayList;
 import java.util.List;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -51,17 +51,17 @@ public final class WorldGenerationScreen extends SeedAtlasScreen {
 	}
 
 	@Override
-	public void extractRenderState(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float partialTick) {
-		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-		graphics.centeredText(this.font, this.title, this.width / 2, 14, -1);
+	public void render(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTick) {
+		super.render(graphics, mouseX, mouseY, partialTick);
+		graphics.drawCenteredString(this.font, this.title, this.width / 2, 14, -1);
 		Component heading = SeedAtlasClientState.currentContextKey().isEmpty()
 			? Component.translatable("screen.seedatlas_xaero.game_version.no_context")
 			: Component.translatable("screen.seedatlas_xaero.game_version", SeedAtlasCommands.gameVersionName());
-		graphics.centeredText(this.font, heading, this.width / 2, 62, 0xFFA0A0A0);
+		graphics.drawCenteredString(this.font, heading, this.width / 2, 62, 0xFFA0A0A0);
 		Component note = SeedAtlasNative.supports(GameVersion.ALL.getLast())
 			? Component.translatable("screen.seedatlas_xaero.game_version.note")
 			: Component.translatable("screen.seedatlas_xaero.game_version.unsupported", GameVersion.NEWEST.name());
-		graphics.centeredText(this.font, note, this.width / 2, this.height - 42, 0xFFA0A0A0);
+		graphics.drawCenteredString(this.font, note, this.width / 2, this.height - 42, 0xFFA0A0A0);
 	}
 
 	@Override
@@ -112,10 +112,10 @@ public final class WorldGenerationScreen extends SeedAtlasScreen {
 		}
 
 		@Override
-		protected void extractWidgetRenderState(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float partialTick) {
+		protected void renderWidget(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTick) {
 			var font = WorldGenerationScreen.this.font;
 			graphics.fill(this.getX(), this.getY(), this.getRight(), this.getBottom(), 0xD0121212);
-			graphics.outline(this.getX(), this.getY(), this.getWidth(), this.getHeight(), 0xFF5A5A5A);
+			graphics.renderOutline(this.getX(), this.getY(), this.getWidth(), this.getHeight(), 0xFF5A5A5A);
 			int left = this.getX() + PAD;
 			int right = this.getRight() - PAD - (maxScroll() > 0 ? SCROLLBAR_WIDTH + 2 : 0);
 			int top = this.getY() + PAD;
@@ -139,10 +139,10 @@ public final class WorldGenerationScreen extends SeedAtlasScreen {
 						: Component.literal(version.label());
 					int textY = y + (ROW_HEIGHT - font.lineHeight) / 2 + 1;
 					int color = !enabled ? 0xFF6A6A6A : selected ? 0xFF7CE07C : 0xFFFFFFFF;
-					graphics.text(font, label, left + 8, textY, color);
+					graphics.drawString(font, label, left + 8, textY, color);
 					if (version != null && !version.hasTerrain()) {
 						Component hint = Component.translatable("screen.seedatlas_xaero.game_version.no_terrain");
-						graphics.text(font, hint, right - 6 - font.width(hint), textY, 0xFF8A8A8A);
+						graphics.drawString(font, hint, right - 6 - font.width(hint), textY, 0xFF8A8A8A);
 					}
 				}
 				y += ROW_HEIGHT;

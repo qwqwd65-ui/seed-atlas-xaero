@@ -30,7 +30,7 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
 import org.seedatlas.xaero.integration.biome.OverworldTerrainSampler.SurfaceGrid;
 
-/** Standalone vanilla 26.1.2 base-column checks; no game, world or chunks are constructed. */
+/** Standalone vanilla 1.21.11 base-column checks; no game, world or chunks are constructed. */
 public final class OverworldTerrainSamplerTest {
     private static final long SEED = 2842062689604764280L;
     private static HolderLookup.Provider lookup;
@@ -41,7 +41,7 @@ public final class OverworldTerrainSamplerTest {
         invalidAreas();
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
-        check(SharedConstants.getCurrentVersion().name().equals("26.1.2"), "Requires Minecraft 26.1.2");
+        check(SharedConstants.getCurrentVersion().name().equals("1.21.11"), "Requires Minecraft 1.21.11");
         lookup = VanillaRegistries.createLookup();
         biomes = MultiNoiseBiomeSource.createFromPreset(lookup.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
                 .getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD));
@@ -358,7 +358,7 @@ public final class OverworldTerrainSamplerTest {
     }
 
     private static void benchmark() throws Exception {
-        System.out.printf("Sampler benchmark: MC=26.1.2 seed=%d largeBiomes=false size=258x258"
+        System.out.printf("Sampler benchmark: MC=1.21.11 seed=%d largeBiomes=false size=258x258"
                         + " Java=%s arch=%s cache=%d tiles contexts=2%n",
                 SEED, System.getProperty("java.version"), System.getProperty("os.arch"), constant("MAX_CACHED_TILES"));
         // Spawn coast and ocean, then the frozen peaks found by the parity check.
