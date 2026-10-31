@@ -137,6 +137,7 @@ public final class XaeroCompatibility {
         XaeroCompatibility check = new XaeroCompatibility(source);
         check.mixinTargets();
         check.injectionTargets();
+        check.argumentIndexes();
         check.linkage();
         return new Report(List.copyOf(check.problems), List.copyOf(check.warnings), Set.copyOf(check.checked));
     }
@@ -195,6 +196,93 @@ public final class XaeroCompatibility {
         } else if (value instanceof List<?> list) {
             for (Object element : list) collectNested(element, found);
         }
+    }
+
+    /**
+     * Checks that each {@code @ModifyArg} names the argument it means to change.
+     *
+     * <p>{@code index} defaults to 0. On 1.21.11 {@code getRenderer} takes the texture consumer
+     * first, so a modifier of the render type that omits {@code index} addresses the consumer
+     * instead: Mixin then rejects the handler for the wrong argument type and the injection fails
+     * at transform time, crashing the game. Nothing else would notice, because the target itself
+     * resolves perfectly well.
+     */
+    private void argumentIndexes() {
+        for (String mixin : MIXINS) {
+            ClassNode node = node(mixin);
+            if (node == null) continue;
+            for (MethodNode method : node.methods) {
+                for (AnnotationNode annotation : annotationsOf(method)) {
+                    if (!annotation.desc.endsWith("/ModifyArg;")) continue;
+                    for (String reference : annotationTargets(annotation)) {
+                        Integer index = intValue(annotation, "index");
+                        int effective = index == null ? 0 : index;
+                        String parameter = parameterAt(reference, effective);
+                        if (parameter == null) continue;
+                        require(parameter.equals(descriptorOf(firstParameter(method.desc))),
+                            simple(mixin) + "." + method.name + " modifies argument " + effective
+                                + " of " + simple(reference) + ", which is " + parameter
+                                + ", but its handler takes " + descriptorOf(firstParameter(method.desc)));
+                    }
+                }
+            }
+        }
+    }
+
+    private static List<AnnotationNode> annotationsOf(MethodNode method) {
+        List<AnnotationNode> all = new ArrayList<>();
+        if (method.visibleAnnotations != null) all.addAll(method.visibleAnnotations);
+        if (method.invisibleAnnotations != null) all.addAll(method.invisibleAnnotations);
+        return all;
+    }
+
+    private static Integer intValue(AnnotationNode annotation, String key) {
+        if (annotation.values == null) return null;
+        for (int i = 0; i + 1 < annotation.values.size(); i += 2) {
+            if (key.equals(String.valueOf(annotation.values.get(i))) && annotation.values.get(i + 1) instanceof Integer value) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    /** The descriptor of one argument of the referenced method, or null when it cannot be read. */
+    private String parameterAt(String reference, int index) {
+        String descriptor = referencedDescriptor(reference);
+        if (descriptor == null) return null;
+        List<String> parameters = Type.getArgumentTypes(descriptor).length == 0
+            ? List.of() : parameterDescriptors(descriptor);
+        return index < parameters.size() ? parameters.get(index) : null;
+    }
+
+    private static List<String> parameterDescriptors(String methodDescriptor) {
+        List<String> out = new ArrayList<>();
+        for (Type type : Type.getArgumentTypes(methodDescriptor)) out.add(type.getDescriptor());
+        return out;
+    }
+
+    private static String firstParameter(String methodDescriptor) {
+        Type[] types = Type.getArgumentTypes(methodDescriptor);
+        return types.length == 0 ? "V" : types[0].getDescriptor();
+    }
+
+    private static String descriptorOf(String descriptor) {
+        return descriptor;
+    }
+
+    /** The descriptor of the referenced method, resolved from the class actually present. */
+    private String referencedDescriptor(String reference) {
+        int semicolon = reference.indexOf(';');
+        int open = reference.indexOf('(', semicolon);
+        if (semicolon < 0 || open < 0) return null;
+        String owner = reference.substring(1, semicolon);
+        String name = reference.substring(semicolon + 1, open);
+        String descriptor = reference.substring(open);
+        ClassNode target = node(owner);
+        if (target == null) return null;
+        return target.methods.stream()
+            .filter(m -> m.name.equals(name) && m.desc.equals(descriptor))
+            .map(m -> m.desc).findFirst().orElse(descriptor);
     }
 
     /** True when an {@code owner;name(desc)ret} reference exists in the classes under inspection. */

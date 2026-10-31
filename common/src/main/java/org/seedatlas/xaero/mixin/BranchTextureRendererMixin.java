@@ -19,10 +19,11 @@ abstract class BranchTextureRendererMixin {
         return 0;
     }
 
+    // getRenderer takes the texture consumer first, so the render type is argument 1.
     @ModifyArg(method = "render", at = @At(
         value = "INVOKE",
         target = "Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider;getRenderer(Ljava/util/function/Consumer;Lnet/minecraft/client/renderer/rendertype/RenderType;)Lxaero/map/graphics/renderer/multitexture/MultiTextureRenderTypeRenderer;"
-    ))
+    ), index = 1)
     private RenderType seedAtlas$exploredOnlyAverage(RenderType type) {
         return ExploredTerrainRenderTypes.replace(type);
     }
