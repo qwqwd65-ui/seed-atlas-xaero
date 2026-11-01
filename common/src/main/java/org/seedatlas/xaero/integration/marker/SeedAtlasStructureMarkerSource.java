@@ -23,6 +23,7 @@ import net.minecraft.world.level.Level;
 import org.seedatlas.xaero.config.MarkerType;
 import org.seedatlas.xaero.config.SeedAtlasClientState;
 import org.seedatlas.xaero.integration.SeedAtlasXaeroIntegration;
+import org.seedatlas.xaero.integration.biome.HardwareProfile;
 import org.seedatlas.xaero.nativeapi.BlockBox;
 import org.seedatlas.xaero.nativeapi.BlockPos;
 import org.seedatlas.xaero.nativeapi.Dimension;
@@ -51,9 +52,9 @@ final class SeedAtlasStructureMarkerSource {
             return thread;
         });
     private static final ThreadPoolExecutor STRUCTURE_WORKERS = new ThreadPoolExecutor(
-        2,
+        1,
         MAX_STRUCTURE_WORKERS,
-        30L,
+        5L,
         TimeUnit.SECONDS,
         new ArrayBlockingQueue<>(64),
         task -> {
@@ -152,7 +153,8 @@ final class SeedAtlasStructureMarkerSource {
                 this.scheduledScan.cancel(false);
             }
             this.scheduledScan = SCAN_COORDINATOR.schedule(() -> {
-                BooleanSupplier current = () -> requestedGeneration == this.generation.get()
+                BooleanSupplier current = () -> SeedAtlasXaeroIntegration.isLayerActive()
+                    && requestedGeneration == this.generation.get()
                     && next.equals(this.requested);
                 if (!current.getAsBoolean()) {
                     return;
@@ -163,6 +165,20 @@ final class SeedAtlasStructureMarkerSource {
                     context.markers = mergeWithSkipped(context.markers, scanned, next.enabled);
                 }
             }, SCAN_DEBOUNCE_MILLIS, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    void idle(SeedAtlasStructureContext context) {
+        clear(context);
+        STRUCTURE_WORKERS.getQueue().clear();
+        if (STRUCTURE_WORKERS.getCorePoolSize() != 1) {
+            STRUCTURE_WORKERS.setCorePoolSize(1);
+        }
+        STRUCTURE_WORKERS.purge();
+        if (HardwareProfile.isConstrainedMemory()) {
+            synchronized (this.cacheLock) {
+                this.scanCache.clear();
+            }
         }
     }
 
@@ -213,7 +229,7 @@ final class SeedAtlasStructureMarkerSource {
     private void cache(Request request, List<SeedAtlasStructureMarker> markers) {
         synchronized (this.cacheLock) {
             this.scanCache.put(request, markers);
-            int limit = 8;
+            int limit = HardwareProfile.isConstrainedMemory() ? 4 : 8;
             while (this.scanCache.size() > limit) {
                 var iterator = this.scanCache.entrySet().iterator();
                 iterator.next();

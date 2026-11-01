@@ -7,6 +7,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.seedatlas.xaero.config.SeedAtlasClientState;
 import org.seedatlas.xaero.config.SeedAtlasConfig;
+import org.seedatlas.xaero.integration.biome.HardwareProfile;
 
 /** Performance controls consumed by the asynchronous map renderer. */
 public final class PerformanceSettingsScreen extends SeedAtlasScreen {
@@ -87,6 +88,7 @@ public final class PerformanceSettingsScreen extends SeedAtlasScreen {
 	private static Component workerMessage(final int workers) {
 		Component value = workers == 0
 			? Component.translatable("options.seedatlas_xaero.worker_threads.auto")
+				.append(" (" + HardwareProfile.autoWorkerThreads() + ")")
 			: Component.literal(Integer.toString(workers));
 		return Component.translatable("options.seedatlas_xaero.worker_threads", value);
 	}

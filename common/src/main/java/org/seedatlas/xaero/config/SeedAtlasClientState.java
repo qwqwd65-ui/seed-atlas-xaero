@@ -21,7 +21,6 @@ import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.storage.LevelResource;
 import org.seedatlas.xaero.SeedAtlasXaero;
 import org.seedatlas.xaero.gui.SeedAtlasSettingsScreen;
-import org.seedatlas.xaero.integration.SeedAtlasXaeroIntegration;
 import org.seedatlas.xaero.nativeapi.Dimension;
 import org.seedatlas.xaero.nativeapi.GameVersion;
 import org.slf4j.Logger;
@@ -48,6 +47,8 @@ public final class SeedAtlasClientState {
 	private static volatile SeedAtlasConfig.SeedProfile activeProfile;
 	private static volatile String autoDetectSuppressedContext;
 	private static volatile ContextProvider contextProvider;
+	private static volatile CachedSingleplayerContext cachedSingleplayerContext;
+	private static volatile CachedServerContext cachedServerContext;
 
 	private SeedAtlasClientState() {
 	}
@@ -529,6 +530,9 @@ public final class SeedAtlasClientState {
 	}
 
 	private static WorldContext resolveContext(final Minecraft minecraft) {
+		if (minecraft == null) {
+			return NO_CONTEXT;
+		}
 		ContextProvider provider = contextProvider;
 		if (provider != null) {
 			try {
@@ -544,21 +548,36 @@ public final class SeedAtlasClientState {
 		IntegratedServer integratedServer = minecraft.getSingleplayerServer();
 		if (integratedServer != null) {
 			String label = integratedServer.getWorldData().getLevelName();
+			CachedSingleplayerContext cached = cachedSingleplayerContext;
+			if (cached != null && cached.server == integratedServer && Objects.equals(cached.label, label)) {
+				return cached.context;
+			}
 			String path = integratedServer.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize().toString();
-			return new WorldContext("singleplayer:" + digest(path), label);
+			WorldContext resolved = new WorldContext("singleplayer:" + digest(path), label);
+			cachedSingleplayerContext = new CachedSingleplayerContext(integratedServer, label, resolved);
+			return resolved;
 		}
 
 		ServerData server = minecraft.getCurrentServer();
 		if (server != null && server.ip != null && !server.ip.isBlank()) {
+			CachedServerContext cached = cachedServerContext;
+			if (cached != null && server.ip.equals(cached.ip) && Objects.equals(server.name, cached.name)) {
+				return cached.context;
+			}
 			String address = server.ip.trim().toLowerCase(Locale.ROOT);
 			String label = server.name == null || server.name.isBlank() ? server.ip : server.name + " (" + server.ip + ")";
-			return new WorldContext("server:" + digest(address), label);
+			WorldContext resolved = new WorldContext("server:" + digest(address), label);
+			cachedServerContext = new CachedServerContext(server.ip, server.name, resolved);
+			return resolved;
 		}
 
 		return NO_CONTEXT;
 	}
 
 	private static OptionalLong detectSingleplayerSeed(final Minecraft minecraft) {
+		if (minecraft == null) {
+			return OptionalLong.empty();
+		}
 		IntegratedServer server = minecraft.getSingleplayerServer();
 		if (server == null) {
 			return OptionalLong.empty();
@@ -574,6 +593,9 @@ public final class SeedAtlasClientState {
 			throw new IllegalStateException("SHA-256 is unavailable", exception);
 		}
 	}
+
+	private record CachedSingleplayerContext(IntegratedServer server, String label, WorldContext context) { }
+	private record CachedServerContext(String ip, String name, WorldContext context) { }
 
 	public enum ChangeReason {
 		CONTEXT,

@@ -65,7 +65,7 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
     private static final int COARSE_TEXTURE_SIZE = 128;
     private static final int MAX_NATIVE_WORKERS = 8;
     private static final int PENDING_LIMIT = 256;
-    private static final int CACHE_LIMIT = 160;
+    private static final int CACHE_LIMIT = HardwareProfile.gpuTileCacheLimit();
     private static final int READY_LIMIT = 192;
     private static final int VIEW_TILE_LIMIT = 1024;
     private static final long RETRY_DELAY_NANOS = TimeUnit.SECONDS.toNanos(3);
@@ -75,9 +75,9 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
     private static final int UPLOADS_PER_FRAME = 8;
 
     private static final ThreadPoolExecutor WORKERS = new ThreadPoolExecutor(
-        2,
+        Math.min(4, HardwareProfile.autoWorkerThreads()),
         MAX_NATIVE_WORKERS,
-        20L,
+        5L,
         TimeUnit.SECONDS,
         new PriorityBlockingQueue<>(),
         task -> {
@@ -161,11 +161,14 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
         cancelAllQueuedTasks();
         this.readyForUpload.clear();
         this.readyKeys.clear();
-        // Shrink the pool so idle cores do not keep spinning worker threads.
+        OverworldTerrainSampler.releaseIdleMemory();
+        NetherCaveMask.releaseIdleMemory();
+        // Shrink the pool and GPU tile cache so normal gameplay stays free of background overhead.
         if (WORKERS.getCorePoolSize() != 1) {
             WORKERS.setCorePoolSize(1);
         }
         WORKERS.purge();
+        runOnClientThread(() -> trimTextureCacheToLimit(HardwareProfile.idleGpuTileCacheLimit(), Set.of()));
     }
 
     /** Called from the client thread whenever the persisted state revision changes. */
@@ -916,10 +919,15 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
     }
 
     private void trimTextureCache(Set<TileKey> protectedKeys) {
-        if (!Minecraft.getInstance().isSameThread()) {
+        trimTextureCacheToLimit(CACHE_LIMIT, protectedKeys);
+    }
+
+    private void trimTextureCacheToLimit(int limit, Set<TileKey> protectedKeys) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || !minecraft.isSameThread()) {
             return;
         }
-        int removable = this.textureCache.size() - CACHE_LIMIT;
+        int removable = this.textureCache.size() - limit;
         if (removable <= 0) {
             return;
         }
@@ -937,7 +945,11 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
     }
 
     private void closeAllTextures() {
-        if (!Minecraft.getInstance().isSameThread()) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null) {
+            return;
+        }
+        if (!minecraft.isSameThread()) {
             runOnClientThread(this::closeAllTextures);
             return;
         }
@@ -955,11 +967,7 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
             }
             return;
         }
-        int workers = SeedAtlasXaeroIntegration.configuredWorkerThreads();
-        if (SeedAtlasClientState.config().structuresEnabled() && workers > 2) {
-            workers -= 2;
-        }
-        workers = Math.clamp(workers, 1, MAX_NATIVE_WORKERS);
+        int workers = Math.clamp(SeedAtlasXaeroIntegration.configuredWorkerThreads(), 1, MAX_NATIVE_WORKERS);
         if (WORKERS.getCorePoolSize() != workers) {
             WORKERS.setCorePoolSize(workers);
         }
@@ -1146,6 +1154,9 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
 
     private static void runOnClientThread(Runnable task) {
         Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null) {
+            return;
+        }
         if (minecraft.isSameThread()) {
             task.run();
         } else {
@@ -1200,12 +1211,7 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
                     return;
                 }
                 if (this.refining) {
-                    // Refinements take seconds; one worker stays free for the coverage of a newly panned view.
-                    if (SeedAtlasBiomeOverlayRenderer.this.refinementsRunning.incrementAndGet()
-                        > Math.max(1, WORKERS.getCorePoolSize() - 1)) {
-                        SeedAtlasBiomeOverlayRenderer.this.refinementsRunning.decrementAndGet();
-                        return;
-                    }
+                    SeedAtlasBiomeOverlayRenderer.this.refinementsRunning.incrementAndGet();
                     refinementSlot = true;
                 }
                 float[][] heightsOut = new float[1][];
@@ -1216,7 +1222,8 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
                         surface = OverworldTerrainSampler.sample(this.key.seed, this.key.largeBiomes,
                             this.key.originBlockX - this.key.sampleStep,
                             this.key.originBlockZ - this.key.sampleStep, this.key.sampleStep,
-                            this.key.textureSize + 2, this.key.textureSize + 2, this::isCurrent);
+                            this.key.textureSize + 2, this.key.textureSize + 2,
+                            this::isCurrent, this::isCurrent);
                     } catch (CancellationException cancelled) {
                         return;
                     } catch (RuntimeException | LinkageError ignored) {
@@ -1225,6 +1232,22 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
                     if (!isCurrent()) return;
                 }
                 boolean hasSurface = surface != null;
+                long[] netherMask = null;
+                if (!hasSurface && this.refining && this.terrainStyle && this.highlightMask.length == 0
+                    && this.key.dimension == Dimension.NETHER && this.key.sampleStep <= 4) {
+                    try {
+                        netherMask = NetherCaveMask.area(this.key.seed,
+                            this.key.originBlockX - this.key.sampleStep,
+                            this.key.originBlockZ - this.key.sampleStep, this.key.sampleStep,
+                            this.key.textureSize + 2, this.key.textureSize + 2, this::isCurrent);
+                    } catch (CancellationException cancelled) {
+                        return;
+                    } catch (RuntimeException | LinkageError ignored) {
+                        netherMask = null;
+                    }
+                    if (!isCurrent()) return;
+                }
+                long[] finalNetherMask = netherMask;
                 BiomeRegion region = SeedAtlasXaeroIntegration.withSession(this.key.seed, this.key.largeBiomes,
                     this.key.gameVersion, session -> {
                     BiomeRegion biomes = session.biomeArea(
@@ -1256,10 +1279,7 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
                                     this.key.textureSize + 2,
                                     this.key.textureSize + 2,
                                     // Carving masks take seconds per coarse tile, so coarser LODs use density only.
-                                    session.supportsNetherCarving() && this.key.sampleStep <= 4 ? NetherCaveMask.area(this.key.seed,
-                                        this.key.originBlockX - this.key.sampleStep,
-                                        this.key.originBlockZ - this.key.sampleStep, this.key.sampleStep,
-                                        this.key.textureSize + 2, this.key.textureSize + 2) : null)
+                                    session.supportsNetherCarving() && this.key.sampleStep <= 4 ? finalNetherMask : null)
                                 : session.heightArea(
                                     this.key.dimension,
                                     this.key.originBlockX - this.key.sampleStep,
@@ -1377,7 +1397,9 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
         }
 
         private boolean isCurrent() {
-            if (this.generation != SeedAtlasBiomeOverlayRenderer.this.generation.get()
+            if (!SeedAtlasBiomeOverlayRenderer.this.mapActive
+                || SeedAtlasXaeroIntegration.isHeavyWorkPaused()
+                || this.generation != SeedAtlasBiomeOverlayRenderer.this.generation.get()
                 || !SeedAtlasXaeroIntegration.isLayerConfigured()) {
                 return false;
             }

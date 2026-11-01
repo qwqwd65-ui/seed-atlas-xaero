@@ -10,6 +10,7 @@ import net.minecraft.network.chat.Component;
 import org.seedatlas.xaero.SeedAtlasXaero;
 import org.seedatlas.xaero.config.SeedAtlasClientState;
 import org.seedatlas.xaero.config.SeedAtlasConfig;
+import org.seedatlas.xaero.integration.biome.HardwareProfile;
 import org.seedatlas.xaero.nativeapi.Dimension;
 import org.seedatlas.xaero.nativeapi.GameVersion;
 import org.seedatlas.xaero.nativeapi.NativeStatus;
@@ -238,6 +239,7 @@ public final class SeedAtlasCommands {
 		));
 		Component workerThreads = config.workerThreads() == 0
 			? Component.translatable("options.seedatlas_xaero.worker_threads.auto")
+				.append(" (" + HardwareProfile.autoWorkerThreads() + ")")
 			: Component.literal(Integer.toString(config.workerThreads()));
 		source.sendFeedback(Component.translatable(
 			"command.seedatlas_xaero.status.performance",

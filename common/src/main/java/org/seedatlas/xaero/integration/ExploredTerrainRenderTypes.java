@@ -35,8 +35,22 @@ import xaero.map.graphics.CustomRenderTypes;
  * {@code XaeroRenderType.RP_MAP_BRANCH}.
  */
 public final class ExploredTerrainRenderTypes {
-    private static final Supplier<GpuSampler> NEAREST = () -> RenderSystem.getDevice()
-        .createSampler(AddressMode.CLAMP_TO_EDGE, AddressMode.CLAMP_TO_EDGE, FilterMode.NEAREST, FilterMode.NEAREST, 1, OptionalDouble.of(0.0));
+    private static GpuSampler nearestSampler;
+    private static final Supplier<GpuSampler> NEAREST = ExploredTerrainRenderTypes::nearestSampler;
+
+    private static GpuSampler nearestSampler() {
+        if (nearestSampler == null) {
+            nearestSampler = RenderSystem.getDevice().createSampler(
+                AddressMode.CLAMP_TO_EDGE,
+                AddressMode.CLAMP_TO_EDGE,
+                FilterMode.NEAREST,
+                FilterMode.NEAREST,
+                1,
+                OptionalDouble.of(0.0)
+            );
+        }
+        return nearestSampler;
+    }
 
     /** Xaero's map writes its colour and keeps the target's alpha. */
     private static final BlendFunction KEEP_DEST_ALPHA =

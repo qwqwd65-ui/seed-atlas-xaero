@@ -9,6 +9,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -17,7 +18,9 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import org.seedatlas.xaero.config.SeedAtlasClientState;
 import org.seedatlas.xaero.integration.biome.BiomeHighlighter;
+import org.seedatlas.xaero.integration.biome.HardwareProfile;
 import org.seedatlas.xaero.integration.biome.SeedAtlasBiomeOverlayRenderer;
+import org.seedatlas.xaero.integration.marker.SeedAtlasStructureRenderer;
 import org.seedatlas.xaero.nativeapi.BiomeSample;
 import org.seedatlas.xaero.nativeapi.Dimension;
 import org.seedatlas.xaero.nativeapi.GameVersion;
@@ -38,6 +41,7 @@ public final class SeedAtlasXaeroIntegration {
     private static volatile double observedMapScale = 1.0;
     /** Biomes of the version they were listed for; versions differ in biomes and their names. */
     private static volatile Map.Entry<GameVersion, List<BiomeSample>> availableBiomes;
+    private static volatile CachedXaeroContext cachedXaeroContext;
     private static boolean initialized;
     /** One engine context per seed; up to three when every dimension has its own seed. */
     private static final int MAX_SESSIONS = 3;
@@ -61,10 +65,17 @@ public final class SeedAtlasXaeroIntegration {
             if (worldId == null || worldId.isBlank()) {
                 return null;
             }
+            CachedXaeroContext cached = cachedXaeroContext;
+            if (cached != null && worldId.equals(cached.worldId)
+                && Objects.equals(multiworldId, cached.multiworldId)) {
+                return cached.context;
+            }
             String label = multiworldId == null || multiworldId.isBlank()
                 ? worldId : worldId + " / " + multiworldId;
-            return new SeedAtlasClientState.WorldContext(
+            SeedAtlasClientState.WorldContext resolved = new SeedAtlasClientState.WorldContext(
                 "xaero:" + contextDigest(worldId, multiworldId), label);
+            cachedXaeroContext = new CachedXaeroContext(worldId, multiworldId, resolved);
+            return resolved;
         });
         initialized = true;
     }
@@ -90,8 +101,9 @@ public final class SeedAtlasXaeroIntegration {
         synchronizeRevision();
         SeedAtlasBiomeOverlayRenderer.INSTANCE.setMapActive(active && !heavyWorkPaused);
         if (!active) {
-            // Leaving the world map must idle native workers and GPU uploads.
+            // Leaving the world map must idle native workers, structure scans, and GPU uploads.
             SeedAtlasBiomeOverlayRenderer.INSTANCE.idleCompletely();
+            SeedAtlasStructureRenderer.INSTANCE.idle();
         }
     }
 
@@ -107,6 +119,7 @@ public final class SeedAtlasXaeroIntegration {
         if (paused) {
             SeedAtlasBiomeOverlayRenderer.INSTANCE.setMapActive(false);
             SeedAtlasBiomeOverlayRenderer.INSTANCE.idleCompletely();
+            SeedAtlasStructureRenderer.INSTANCE.idle();
         } else if (fullMapActive) {
             synchronizeRevision();
             SeedAtlasBiomeOverlayRenderer.INSTANCE.setMapActive(true);
@@ -278,7 +291,7 @@ public final class SeedAtlasXaeroIntegration {
         if (configured > 0) {
             return Math.clamp(configured, 1, 8);
         }
-        return Math.clamp(Runtime.getRuntime().availableProcessors() - 2, 2, 8);
+        return HardwareProfile.autoWorkerThreads();
     }
 
     public static double observedMapScale() {
@@ -318,6 +331,7 @@ public final class SeedAtlasXaeroIntegration {
     }
 
     private record SessionKey(long seed, boolean largeBiomes, GameVersion gameVersion) { }
+    private record CachedXaeroContext(String worldId, String multiworldId, SeedAtlasClientState.WorldContext context) { }
 
     private static String contextDigest(String worldId, String multiworldId) {
         try {

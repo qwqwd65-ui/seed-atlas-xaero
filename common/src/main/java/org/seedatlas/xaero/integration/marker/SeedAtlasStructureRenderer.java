@@ -3,11 +3,11 @@ package org.seedatlas.xaero.integration.marker;
 import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.List;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource.BufferSource;
 import org.seedatlas.xaero.config.SeedAtlasClientState;
 import org.seedatlas.xaero.integration.SeedAtlasXaeroIntegration;
 import org.seedatlas.xaero.integration.icon.CompletedBadge;
 import org.seedatlas.xaero.integration.icon.StructureIcons;
-import net.minecraft.client.renderer.MultiBufferSource.BufferSource;
 import xaero.map.element.MapElementGraphics;
 import xaero.map.element.render.ElementRenderInfo;
 import xaero.map.element.render.ElementRenderLocation;
@@ -37,6 +37,11 @@ public final class SeedAtlasStructureRenderer extends ElementRenderer<
     ) {
         super(context, provider, reader);
         this.source = new SeedAtlasStructureMarkerSource();
+    }
+
+    public void idle() {
+        this.context.batchedIcons = null;
+        this.source.idle(this.context);
     }
 
     @Override

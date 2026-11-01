@@ -1,18 +1,19 @@
 package org.seedatlas.xaero.integration.biome;
 
 import java.util.LinkedHashMap;
+import java.util.Objects;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.biome.FixedBiomeSource;
-import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.CarvingMask;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ProtoChunk;
@@ -43,6 +44,10 @@ public final class NetherCaveMask {
      * Dimensions must be 1..262 (including a tile's halo). Minecraft must already be bootstrapped.
      */
     public static long[] area(long seed, int originX, int originZ, int step, int width, int height) {
+        return area(seed, originX, originZ, step, width, height, () -> true);
+    }
+
+    static long[] area(long seed, int originX, int originZ, int step, int width, int height, BooleanSupplier fastAbort) {
         if (step < 1 || step > 16 || (step & (step - 1)) != 0) {
             throw new IllegalArgumentException("step must be one of 1, 2, 4, 8, or 16");
         }
@@ -53,12 +58,14 @@ public final class NetherCaveMask {
                 || (long) originZ + (long) height * step - 1 > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("Mask area exceeds block coordinate limits");
         }
+        Objects.requireNonNull(fastAbort, "fastAbort");
         long[] result = new long[width * height * 2];
         for (int z = 0; z < height; ++z) {
+            requireCurrent(fastAbort);
             int blockZ = sampleCoordinate(originZ, z, step);
             for (int x = 0; x < width; ++x) {
                 int blockX = sampleCoordinate(originX, x, step);
-                long[] chunk = chunkMask(new Key(seed, blockX >> 4, blockZ >> 4));
+                long[] chunk = chunkMask(new Key(seed, blockX >> 4, blockZ >> 4), fastAbort);
                 int source = ((blockZ & 15) * 16 + (blockX & 15)) * 2;
                 int target = (z * width + x) * 2;
                 result[target] = chunk[source];
@@ -68,22 +75,34 @@ public final class NetherCaveMask {
         return result;
     }
 
+    public static synchronized void releaseIdleMemory() {
+        CACHE.clear();
+    }
+
     private static int sampleCoordinate(int origin, int index, int step) {
         long block = (long) origin + (long) index * step;
         return (int) (step >= 8 ? Math.floorDiv(block + step / 2 + 2, 4L) * 4
                 : block + (step - 1) / 2);
     }
 
-    private static synchronized long[] chunkMask(Key key) {
-        long[] mask = CACHE.get(key);
-        if (mask != null) return mask;
-        mask = generate(key);
-        if (CACHE.size() == MAX_CACHED_CHUNKS) CACHE.remove(CACHE.keySet().iterator().next());
-        CACHE.put(key, mask);
-        return mask;
+    private static long[] chunkMask(Key key, BooleanSupplier fastAbort) {
+        synchronized (NetherCaveMask.class) {
+            long[] mask = CACHE.get(key);
+            if (mask != null) return mask;
+        }
+        requireCurrent(fastAbort);
+        long[] generated = generate(key, fastAbort);
+        synchronized (NetherCaveMask.class) {
+            long[] existing = CACHE.get(key);
+            if (existing != null) return existing;
+            if (CACHE.size() == MAX_CACHED_CHUNKS) CACHE.remove(CACHE.keySet().iterator().next());
+            CACHE.put(key, generated);
+            return generated;
+        }
     }
 
-    private static long[] generate(Key key) {
+    private static long[] generate(Key key, BooleanSupplier fastAbort) {
+        Vanilla state = Vanilla.get();
         long[] mask = new long[16 * 16 * 2];
         var target = new ChunkPos(key.chunkX, key.chunkZ);
         var random = new WorldgenRandom(new LegacyRandomSource(0));
@@ -92,10 +111,11 @@ public final class NetherCaveMask {
         var shell = new ProtoChunk(target, UpgradeData.EMPTY, LevelHeightAccessor.create(0, 0), null, null);
         var output = new CarvingMask(128, 0);
         for (int dx = -8; dx <= 8; ++dx) {
+            requireCurrent(fastAbort);
             for (int dz = -8; dz <= 8; ++dz) {
                 var source = new ChunkPos(key.chunkX + dx, key.chunkZ + dz);
                 int index = 0;
-                for (var holder : Vanilla.CARVERS) {
+                for (var holder : state.carvers) {
                     var carver = holder.value();
                     random.setLargeFeatureSeed(key.seed + index++, source.x, source.z);
                     if (carver.isStartChunk(random)) {
@@ -103,7 +123,7 @@ public final class NetherCaveMask {
                                 || !(carver.config() instanceof CaveCarverConfiguration configuration)) {
                             throw new IllegalStateException("Unsupported built-in Nether carver");
                         }
-                        Vanilla.RECORDER.carve(Vanilla.CONTEXT, configuration, shell, null, random, null, source, output);
+                        Vanilla.RECORDER.carve(state.context, configuration, shell, null, random, null, source, output);
                     }
                 }
             }
@@ -116,18 +136,13 @@ public final class NetherCaveMask {
         return mask;
     }
 
+    private static void requireCurrent(BooleanSupplier fastAbort) {
+        if (!fastAbort.getAsBoolean()) throw new CancellationException("Nether cave mask sample is no longer current");
+    }
+
     private record Key(long seed, int chunkX, int chunkZ) { }
 
     private static final class Vanilla {
-        private static final HolderLookup.Provider LOOKUP = VanillaRegistries.createLookup();
-        // All five built-in Nether biomes share these carvers; no live biome source is needed.
-        private static final Iterable<Holder<ConfiguredWorldCarver<?>>> CARVERS = LOOKUP.lookupOrThrow(Registries.BIOME)
-                .getOrThrow(Biomes.NETHER_WASTES).value().getGenerationSettings().getCarvers();
-        private static final CarvingContext CONTEXT = new CarvingContext(
-                new NoiseBasedChunkGenerator(new FixedBiomeSource(LOOKUP.lookupOrThrow(Registries.BIOME)
-                        .getOrThrow(Biomes.NETHER_WASTES)),
-                        LOOKUP.lookupOrThrow(Registries.NOISE_SETTINGS).getOrThrow(NoiseGeneratorSettings.NETHER)),
-                RegistryAccess.EMPTY, LevelHeightAccessor.create(0, 256), null, null, null);
         private static final NetherWorldCarver RECORDER = new NetherWorldCarver(CaveCarverConfiguration.CODEC) {
             @Override protected boolean carveBlock(CarvingContext context, CaveCarverConfiguration configuration,
                     ChunkAccess chunk, Function<BlockPos, Holder<Biome>> biomeGetter, CarvingMask mask,
@@ -137,5 +152,35 @@ public final class NetherCaveMask {
                 return true;
             }
         };
+        private static volatile Vanilla instance;
+
+        private final Iterable<Holder<ConfiguredWorldCarver<?>>> carvers;
+        private final CarvingContext context;
+
+        private Vanilla() {
+            var lookup = VanillaLookup.get();
+            var netherWastes = lookup.lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.NETHER_WASTES);
+            // All five built-in Nether biomes share these carvers; no live biome source is needed.
+            this.carvers = netherWastes.value().getGenerationSettings().getCarvers();
+            this.context = new CarvingContext(
+                    new NoiseBasedChunkGenerator(
+                            new FixedBiomeSource(netherWastes),
+                            lookup.lookupOrThrow(Registries.NOISE_SETTINGS).getOrThrow(NoiseGeneratorSettings.NETHER)),
+                    RegistryAccess.EMPTY, LevelHeightAccessor.create(0, 256), null, null, null);
+        }
+
+        private static Vanilla get() {
+            Vanilla current = instance;
+            if (current == null) {
+                synchronized (Vanilla.class) {
+                    current = instance;
+                    if (current == null) {
+                        current = new Vanilla();
+                        instance = current;
+                    }
+                }
+            }
+            return current;
+        }
     }
 }
