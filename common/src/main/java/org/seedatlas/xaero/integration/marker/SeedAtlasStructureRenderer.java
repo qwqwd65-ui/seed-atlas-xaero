@@ -59,7 +59,8 @@ public final class SeedAtlasStructureRenderer extends ElementRenderer<
             Math.min(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight())
         );
         // PNGs use straight alpha. Nearest sampling keeps the original pixel-art edges crisp.
-        this.context.batchedIcons = rendererProvider.getRenderer(texture -> { }, CustomRenderTypes.GUI_NEAREST);
+        this.context.batchedIcons = rendererProvider.getRenderer(
+            MultiTextureRenderTypeRendererProvider::defaultTextureBind, CustomRenderTypes.GUI_NEAREST);
         this.source.request(
             this.context,
             renderInfo.mapDimension,

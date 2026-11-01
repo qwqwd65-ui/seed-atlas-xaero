@@ -424,8 +424,8 @@ public final class SeedAtlasBiomeOverlayRenderer extends ElementRenderer<
         this.context.slices = view == null ? List.of() : buildSlices(view);
         trimTextureCache(protectedTileKeys(this.context.slices));
 
-        MultiTextureRenderTypeRenderer renderer =
-            rendererProvider.getRenderer(texture -> { }, CustomRenderTypes.GUI_NEAREST);
+        MultiTextureRenderTypeRenderer renderer = rendererProvider.getRenderer(
+            MultiTextureRenderTypeRendererProvider::defaultTextureBind, CustomRenderTypes.GUI_NEAREST);
         Matrix4f matrix = pose.last().pose();
         float alpha = focused ? 1.0F : SeedAtlasClientState.config().opacityFraction();
         float depth = focused || overlayExplored ? 1.0F : -1.0F;

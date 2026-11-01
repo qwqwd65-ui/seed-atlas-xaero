@@ -1,5 +1,4 @@
 #version 330
-#extension GL_ARB_separate_shader_objects : require
 
 // Xaero's map shader, except that unexplored texels (all zero) never take part in filtering. Linear
 // minification blended them in as black, and the result was drawn opaque: a dark seam around explored
@@ -15,9 +14,9 @@ layout(std140) uniform WithLightBlock {
     int WithLight;
 };
 
-layout(location = 0) in vec2 texCoord0;
+in vec2 texCoord0;
 
-layout(location = 0) out vec4 fragColor;
+out vec4 fragColor;
 
 vec4 texel(ivec2 position, ivec2 size) {
     return texelFetch(Sampler0, clamp(position, ivec2(0), size - 1), 0);

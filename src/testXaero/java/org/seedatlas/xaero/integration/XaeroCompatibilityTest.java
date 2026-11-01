@@ -16,6 +16,7 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.seedatlas.xaero.compat.XaeroCompatibility;
@@ -62,6 +63,15 @@ public final class XaeroCompatibilityTest {
         }
         breaks(installed, "xaero/map/region/BranchLeveledRegion",
             node -> node.methods.removeIf(m -> m.name.equals("findCacheFile")), "findCacheFile");
+        breaks(installed, "xaero/map/WorldMap", node -> {
+            var target = method(node, "loadLater");
+            for (var instruction : target.instructions.toArray()) {
+                if (instruction instanceof FieldInsnNode field && field.getOpcode() == Opcodes.PUTSTATIC
+                    && field.name.equals("mapElementRenderHandler")) {
+                    target.instructions.remove(instruction);
+                }
+            }
+        }, "no longer assigns mapElementRenderHandler");
         breaks(installed, "xaero/map/MapProcessor", node -> node.methods.removeIf(m -> m.name.equals("getCurrentCaveLayer")),
             "getCurrentCaveLayer");
         breaks(installed, "xaero/map/element/render/ElementRenderer", node -> {

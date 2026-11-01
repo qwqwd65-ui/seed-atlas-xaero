@@ -1,5 +1,6 @@
 package org.seedatlas.xaero.integration;
 
+import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.platform.DestFactor;
 import com.mojang.blaze3d.platform.SourceFactor;
 import com.mojang.blaze3d.pipeline.BlendFunction;
@@ -27,9 +28,11 @@ import xaero.map.graphics.CustomRenderTypes;
  * leave unexplored texels out of filtering. Xaero's own blend them in as black, which only shows once
  * the seed layer, not black, surrounds the explored terrain.
  *
- * <p>1.21.11 still folds blend and depth state into {@link RenderPipeline} itself: there is one
- * {@code withBlend(BlendFunction)} and no separate colour-target or depth-stencil state objects, so
- * both types are built from the same pipeline builder and differ only in their blend function.
+ * <p>1.21.11 folds blend and depth state directly into {@link RenderPipeline}, and its builder
+ * defaults to {@code LEQUAL_DEPTH_TEST} with depth writes enabled: {@link #map()} keeps those
+ * defaults while preserving destination alpha like {@code XaeroRenderType.RP_MAP}, whereas
+ * {@link #branch()} explicitly disables blending, depth testing and depth writes to match
+ * {@code XaeroRenderType.RP_MAP_BRANCH}.
  */
 public final class ExploredTerrainRenderTypes {
     private static final Supplier<GpuSampler> NEAREST = () -> RenderSystem.getDevice()
@@ -83,7 +86,10 @@ public final class ExploredTerrainRenderTypes {
                 .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
                 .withUniform("Projection", UniformType.UNIFORM_BUFFER)
                 .withSampler("Sampler0")
+                .withoutBlend()
                 .withCull(false)
+                .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+                .withDepthWrite(false)
                 .build();
             branch = XaeroRenderType.createRenderType("seedatlas_explored_map_branch",
                 RenderSetup.builder(pipeline).withTexture("Sampler0", WorldMap.guiTextures, NEAREST));

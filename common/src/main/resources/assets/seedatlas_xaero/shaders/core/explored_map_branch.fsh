@@ -1,14 +1,13 @@
 #version 330
-#extension GL_ARB_separate_shader_objects : require
 
 // Builds Xaero's zoomed-out textures like its own branch shader, but averages only explored texels:
 // unexplored ones (all zero) used to darken the edges of explored terrain in every coarser level.
 
 uniform sampler2D Sampler0;
 
-layout(location = 0) in vec2 texCoord0;
+in vec2 texCoord0;
 
-layout(location = 0) out vec4 fragColor;
+out vec4 fragColor;
 
 void main() {
     ivec2 size = textureSize(Sampler0, 0);

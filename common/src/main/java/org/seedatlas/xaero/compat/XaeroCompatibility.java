@@ -182,7 +182,7 @@ public final class XaeroCompatibility {
         for (int i = 0; i + 1 < annotation.values.size(); i += 2) {
             Object value = annotation.values.get(i + 1);
             if (String.valueOf(annotation.values.get(i)).equals("target") && value instanceof String single
-                && single.startsWith("L") && single.contains(";") && single.contains("(")) {
+                && single.startsWith("L") && single.contains(";") && (single.contains("(") || single.contains(":"))) {
                 found.add(single);
             }
             collectNested(value, found);
@@ -285,21 +285,27 @@ public final class XaeroCompatibility {
             .map(m -> m.desc).findFirst().orElse(descriptor);
     }
 
-    /** True when an {@code owner;name(desc)ret} reference exists in the classes under inspection. */
+    /** True when an {@code Lowner;name(desc)ret} or {@code Lowner;name:desc} reference exists. */
     private boolean resolves(String reference) {
         int semicolon = reference.indexOf(';');
-        int paren = reference.indexOf('(');
-        if (semicolon < 0 || paren < semicolon) return false;
+        if (semicolon < 0) return false;
         String owner = reference.substring(1, semicolon);
         String rest = reference.substring(semicolon + 1);
-        int open = rest.indexOf('(');
-        if (open < 0) return false;
-        String name = rest.substring(0, open);
-        String descriptor = rest.substring(open);
         ClassNode target = node(owner);
         if (target == null) return false;
-        return target.methods.stream().anyMatch(m -> m.name.equals(name) && m.desc.equals(descriptor))
-            || target.fields.stream().anyMatch(f -> f.name.equals(name));
+        int open = rest.indexOf('(');
+        if (open >= 0) {
+            String name = rest.substring(0, open);
+            String descriptor = rest.substring(open);
+            return target.methods.stream().anyMatch(m -> m.name.equals(name) && m.desc.equals(descriptor));
+        }
+        int colon = rest.indexOf(':');
+        if (colon >= 0) {
+            String name = rest.substring(0, colon);
+            String descriptor = rest.substring(colon + 1);
+            return target.fields.stream().anyMatch(f -> f.name.equals(name) && f.desc.equals(descriptor));
+        }
+        return false;
     }
 
     /** Records the plugin's verdict for this game session. */
@@ -378,9 +384,13 @@ public final class XaeroCompatibility {
         // equivalent work lived in WorldMapClientOnly.loadLaterClientRender.
         ClassNode worldMap = xaeroClass("xaero/map/WorldMap");
         if (worldMap != null) {
-            method(worldMap, "loadLater", "()V");
-            field(worldMap, "mapElementRenderHandler",
-                "Lxaero/map/element/MapElementRenderHandler;", true);
+            String handler = "Lxaero/map/element/MapElementRenderHandler;";
+            MethodNode loadLater = method(worldMap, "loadLater", "()V");
+            field(worldMap, "mapElementRenderHandler", handler, true);
+            if (loadLater != null) {
+                require(assignsStatic(loadLater, "xaero/map/WorldMap", "mapElementRenderHandler", handler),
+                    "WorldMap.loadLater no longer assigns mapElementRenderHandler");
+            }
         }
     }
 
@@ -418,6 +428,16 @@ public final class XaeroCompatibility {
                 && method.instructions.indexOf(local.end) > index).count();
             require(matches == 1, "GuiMap." + renderMethod() + ": captured local " + name + " is missing or ambiguous");
         }
+    }
+
+    private static boolean assignsStatic(MethodNode method, String owner, String name, String descriptor) {
+        for (AbstractInsnNode instruction : method.instructions) {
+            if (instruction instanceof FieldInsnNode field && field.getOpcode() == Opcodes.PUTSTATIC
+                && field.owner.equals(owner) && field.name.equals(name) && field.desc.equals(descriptor)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean invokes(MethodNode method, String owner, String name, String descriptor) {

@@ -282,11 +282,3 @@ tasks.register('productionCompatTest', JavaExec) {
         .filter { it.name.contains('xaeroworldmap') }.singleFile
 }
 tasks.named('check') { dependsOn tasks.named('productionCompatTest') }
-tasks.named('check') { dependsOn tasks.named('xaeroCompatibilityTest') }
-
-// TEMP diagnostics
-gradle.projectsEvaluated {
-    println "=== configs matching mod/client ==="
-    configurations.names.findAll { it.toLowerCase().contains('mod') || it.toLowerCase().contains('client') }
-        .sort().each { println "  " + it }
-}
