@@ -44,7 +44,7 @@ public final class XaeroCompatibility {
         "org/seedatlas/xaero/mixin/BranchTextureRendererMixin",
         "org/seedatlas/xaero/mixin/BranchRegionTextureMixin",
         "org/seedatlas/xaero/mixin/BranchLeveledRegionMixin",
-        "org/seedatlas/xaero/mixin/WorldMapClientOnlyMixin");
+        "org/seedatlas/xaero/mixin/WorldMapMixin");
     /** Everything that touches Xaero is reachable from these classes. */
     static final List<String> ROOTS = List.of(
         "org/seedatlas/xaero/SeedAtlasXaero",
@@ -53,7 +53,7 @@ public final class XaeroCompatibility {
         "org/seedatlas/xaero/mixin/BranchTextureRendererMixin",
         "org/seedatlas/xaero/mixin/BranchRegionTextureMixin",
         "org/seedatlas/xaero/mixin/BranchLeveledRegionMixin",
-        "org/seedatlas/xaero/mixin/WorldMapClientOnlyMixin");
+        "org/seedatlas/xaero/mixin/WorldMapMixin");
     /** Catches LinkageError itself and only loses waypoint shortcuts, so it never disables Seed Atlas. */
     private static final Set<String> OPTIONAL = Set.of(
         "org/seedatlas/xaero/integration/marker/SeedAtlasWaypointBridge");
@@ -374,8 +374,14 @@ public final class XaeroCompatibility {
         }
         ClassNode branchRegion = xaeroClass("xaero/map/region/BranchLeveledRegion");
         if (branchRegion != null) method(branchRegion, "findCacheFile", "(Lxaero/map/file/MapSaveLoad;)Ljava/io/File;");
-        ClassNode clientOnly = xaeroClass("xaero/map/WorldMapClientOnly");
-        if (clientOnly != null) method(clientOnly, "postInit", "()V");
+        // The map element handler is assigned by WorldMap.loadLater on 1.21.11; up to 26.1.2 the
+        // equivalent work lived in WorldMapClientOnly.loadLaterClientRender.
+        ClassNode worldMap = xaeroClass("xaero/map/WorldMap");
+        if (worldMap != null) {
+            method(worldMap, "loadLater", "()V");
+            field(worldMap, "mapElementRenderHandler",
+                "Lxaero/map/element/MapElementRenderHandler;", true);
+        }
     }
 
     /** Both GuiMapMixin injections into GuiMap's render method, including the locals they capture. */
